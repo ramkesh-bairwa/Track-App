@@ -1,0 +1,176 @@
+/* Shared by every tool (components/tools/*). Tool-specific styles live in
+   each tool's own CSS file. */
+.tool-back {
+  display: inline-block;
+  margin-bottom: 8px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+.tool-back:hover {
+  color: var(--text);
+}
+.tool-head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.tool-head-icon,
+.tool-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  background: var(--panel-raised);
+  color: var(--accent-text);
+  font-size: 16px;
+}
+
+/* A bordered block of controls or results. */
+.tool-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-bottom: 14px;
+  min-width: 0;
+}
+.tool-panel h2 {
+  font-size: 14px;
+  margin: 0 0 12px;
+}
+/* Two columns (controls | output) that stack on narrow screens. */
+.tool-split {
+  display: grid;
+  grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+.tool-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.tool-muted {
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+.tool-empty {
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 24px 8px;
+  text-align: center;
+}
+/* Drop zone for files. */
+.tool-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 28px 16px;
+  border: 1.5px dashed var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+  cursor: pointer;
+}
+.tool-drop.over,
+.tool-drop:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+.tool-drop input[type='file'] {
+  display: none;
+}
+.tool-table-wrap {
+  overflow-x: auto;
+}
+.tool-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.tool-table th,
+.tool-table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--border-soft);
+  text-align: left;
+  vertical-align: top;
+  word-break: break-word;
+}
+.tool-table th {
+  color: var(--text-faint);
+  font-weight: 500;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.tool-badge {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  background: var(--panel-raised);
+  color: var(--text-muted);
+}
+.tool-badge.ok {
+  background: color-mix(in srgb, #35c2a6 18%, transparent);
+  /* Mixed toward the text colour so it stays readable on light and dark. */
+  color: color-mix(in srgb, #35c2a6 70%, var(--text));
+}
+.tool-badge.warn {
+  background: color-mix(in srgb, #e8a33d 18%, transparent);
+  color: color-mix(in srgb, #e8a33d 70%, var(--text));
+}
+.tool-badge.bad {
+  background: var(--danger-dim);
+  color: var(--danger);
+}
+.tool-mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+/* Hub: /dashboard/tools */
+.tool-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 12px;
+}
+.tool-card {
+  display: flex;
+  gap: 12px;
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  text-decoration: none;
+}
+.tool-card:hover {
+  border-color: var(--accent);
+}
+.tool-card strong {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 3px;
+}
+.tool-card span {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+@media (max-width: 900px) {
+  .tool-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

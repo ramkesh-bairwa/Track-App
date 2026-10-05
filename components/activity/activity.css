@@ -1,0 +1,136 @@
+/* ---------------- Activity log (automatic "what I did") ---------------- */
+.act-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.act-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px dashed var(--border-soft);
+  font-size: 13px;
+  min-width: 0;
+}
+.act-item:last-child {
+  border-bottom: 0;
+}
+.act-time {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-muted);
+  min-width: 46px;
+  white-space: nowrap;
+}
+.act-until {
+  color: var(--text-faint);
+}
+.act-icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  background: var(--accent-dim);
+  color: var(--accent-text);
+}
+.act-deleted .act-icon {
+  background: var(--danger-dim);
+  color: var(--danger);
+}
+.act-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  text-decoration: none;
+}
+a.act-body:hover .act-summary {
+  color: var(--accent-text);
+  text-decoration: underline;
+}
+.act-summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.act-hits {
+  font-size: 11px;
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+.act-tag {
+  font-size: 10.5px;
+  color: var(--text-faint);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 6px;
+  flex-shrink: 0;
+}
+.act-empty {
+  font-size: 12.5px;
+  color: var(--text-faint);
+  margin: 0;
+}
+.act-list.compact .act-item {
+  padding: 5px 0;
+}
+.act-list.compact .act-time {
+  min-width: 40px;
+}
+
+/* Activity page */
+.act-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.act-toolbar .input {
+  width: auto;
+}
+.act-toolbar .act-search {
+  flex: 1;
+  min-width: 180px;
+}
+.act-day {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 16px;
+  margin-bottom: 12px;
+}
+.act-day-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  padding: 4px 0 6px;
+  border-bottom: 1px solid var(--border-soft);
+  margin-bottom: 2px;
+}
+.act-day-head h2 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+}
+.act-day-head span {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.act-more {
+  display: flex;
+  justify-content: center;
+  margin: 8px 0 24px;
+}
+@media (max-width: 640px) {
+  .act-tag {
+    display: none;
+  }
+}

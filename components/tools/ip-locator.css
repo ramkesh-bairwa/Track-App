@@ -1,0 +1,436 @@
+/* IP Locator (components/tools/IpLocator.js) */
+.ipl-form {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+.ipl-input {
+  flex: 1;
+  min-width: 0;
+}
+.ipl-form .btn {
+  height: 38px;
+  white-space: nowrap;
+}
+.ipl-hint {
+  margin: 10px 0 0;
+  line-height: 1.5;
+}
+
+.ipl-result {
+  display: grid;
+  grid-template-columns: minmax(0, 340px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+.ipl-head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.ipl-head strong {
+  font-size: 15px;
+  word-break: break-all;
+}
+.ipl-flag {
+  font-size: 28px;
+  line-height: 1;
+  color: var(--text-muted);
+}
+.ipl-coords {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border-radius: var(--radius-sm);
+  background: var(--panel-raised);
+}
+.ipl-coord-text {
+  font-size: 13px;
+  margin-top: 2px;
+  color: var(--text);
+}
+.ipl-rows {
+  margin: 0;
+}
+.ipl-row {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 13px;
+}
+.ipl-row:last-child {
+  border-bottom: 0;
+}
+.ipl-row dt {
+  color: var(--text-muted);
+}
+.ipl-row dd {
+  margin: 0;
+  word-break: break-word;
+}
+.ipl-links {
+  margin-top: 12px;
+}
+
+.ipl-map-panel {
+  position: relative;
+  padding: 0;
+  overflow: hidden;
+}
+.ipl-map-wrap {
+  position: relative;
+  /* Leaflet's panes use z-index up to 1000; keep them below the app's modals. */
+  isolation: isolate;
+  z-index: 0;
+}
+.ipl-map {
+  height: 420px;
+  background: var(--panel-raised);
+}
+
+@media (max-width: 900px) {
+  .ipl-result {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ipl-map {
+    height: 320px;
+  }
+}
+@media (max-width: 600px) {
+  .ipl-form {
+    flex-wrap: wrap;
+  }
+  .ipl-input {
+    flex-basis: 100%;
+  }
+  .ipl-form .btn {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+.ipl-gps {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-soft);
+}
+.ipl-gps > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  min-width: 0;
+}
+.ipl-note {
+  margin-bottom: 12px;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+  color: color-mix(in srgb, var(--warn) 70%, var(--text));
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* Tabs: IP address | IMEI number */
+.ipl-tabs {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+}
+.ipl-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: calc(var(--radius-sm) - 2px);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.ipl-tabs button.active {
+  background: var(--panel-raised);
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* IMEI tab (components/tools/ImeiPanel.js) */
+.ipl-imei-check {
+  margin-top: 10px;
+  font-size: 13px;
+}
+.ipl-imei-check.ok {
+  color: color-mix(in srgb, #35c2a6 70%, var(--text));
+}
+.ipl-imei-check.bad {
+  color: var(--danger);
+}
+.ipl-imei-parts {
+  margin-top: 10px;
+}
+.ipl-imei-ways {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+.ipl-imei-ways h2 i {
+  margin-right: 6px;
+  color: var(--accent-text);
+}
+.tool-panel h2.ipl-h-gap {
+  margin-top: 18px;
+}
+.ipl-steps {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.ipl-steps li + li {
+  margin-top: 6px;
+}
+.ipl-text {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+.ipl-kym {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--panel-raised);
+}
+.ipl-kym > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  min-width: 0;
+}
+@media (max-width: 900px) {
+  .ipl-imei-ways {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* My devices (components/tools/MyDevices.js) */
+.ipl-dev-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.ipl-dev-head h2 {
+  margin-bottom: 4px;
+}
+.ipl-dev-head p {
+  margin: 0;
+  line-height: 1.5;
+}
+.ipl-dev-head .btn {
+  white-space: nowrap;
+}
+.ipl-dev-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+.ipl-dev-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.ipl-field-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+}
+.ipl-field-hint.ok {
+  color: color-mix(in srgb, #35c2a6 70%, var(--text));
+}
+.ipl-field-hint.bad {
+  color: var(--danger);
+}
+.ipl-dev-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ipl-dev {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+}
+.ipl-dev-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  background: var(--panel-raised);
+  color: var(--accent-text);
+}
+.ipl-dev-main {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+}
+.ipl-dev-imei {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 2px;
+}
+.ipl-dev-imei .tool-muted {
+  min-width: 46px;
+}
+.ipl-dev-notes {
+  margin-top: 4px;
+}
+.ipl-dev-actions {
+  display: flex;
+  gap: 2px;
+}
+@media (max-width: 600px) {
+  .ipl-dev-head {
+    flex-direction: column;
+  }
+  .ipl-dev-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+
+/* Device presence + map (components/tools/MyDevices.js) */
+.ipl-dev-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-top: 8px;
+}
+.ipl-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 3px;
+  border-radius: 50%;
+  background: #35c2a6;
+  vertical-align: 1px;
+  animation: ipl-pulse 1.6s ease-in-out infinite;
+}
+@keyframes ipl-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+.ipl-dev-share {
+  margin-top: 6px;
+  font-size: 12px;
+  color: color-mix(in srgb, #35c2a6 70%, var(--text));
+}
+.ipl-dev-share.bad {
+  color: var(--warn);
+}
+.ipl-dev-map {
+  margin-top: 14px;
+}
+.ipl-dev-map-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px 12px;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+.ipl-dev-map-frame {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ipl-dot {
+    animation: none;
+  }
+}
+
+/* Leaflet map (components/tools/TileMap.js) */
+.ipl-leaflet-pin {
+  background: none;
+  border: 0;
+}
+.ipl-leaflet-pin > i {
+  display: block;
+  font-size: 34px;
+  line-height: 34px;
+  text-align: center;
+  color: #e5484d;
+  filter: drop-shadow(0 2px 2px rgb(0 0 0 / 0.35));
+}
+.ipl-leaflet-pin .ipl-pin-label {
+  position: absolute;
+  left: 50%;
+  bottom: 38px;
+  transform: translateX(-50%);
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #fff;
+  color: #222;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.3);
+}
+.ipl-recenter {
+  position: absolute;
+  top: 82px;
+  left: 10px;
+  z-index: 1000;
+  width: 34px;
+  height: 34px;
+  border: 2px solid rgb(0 0 0 / 0.2);
+  border-radius: 4px;
+  background: #fff;
+  color: #333;
+  cursor: pointer;
+  background-clip: padding-box;
+}
+.ipl-recenter:hover {
+  background-color: #f4f4f4;
+}

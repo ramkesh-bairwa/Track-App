@@ -1,0 +1,72 @@
+# MyTrack security self-test report
+- Target: http://localhost:3000
+- Run: 2026-09-30T11:48:24.635Z
+- Result: **50 defended, 0 to review**
+
+## Checks that passed (50)
+
+- ✓ [calendar] Calendar requires a session — returns 401 without a cookie
+- ✓ [calendar] Date param rejects "2026-01-01' OR '1'='1" — rejected as an invalid date (400)
+- ✓ [calendar] Date param rejects "2026-01-01; DROP TABLE users; --" — rejected as an invalid date (400)
+- ✓ [calendar] Date param rejects "2026-13-45" — rejected as an invalid date (400)
+- ✓ [calendar] Date param rejects "../../etc" — rejected as an invalid date (400)
+- ✓ [calendar] Time-based blind SQLi (SLEEP) has no effect — answered in 11 ms (400)
+- ✓ [calendar] SQLi in activity title is stored as plain text — saved and read back exactly as typed — never executed
+- ✓ [calendar] Database intact after DROP TABLE payload — users table still answers
+- ✓ [calendar] Another user's calendar is not visible — attacker's range query returned none of the victim's rows
+- ✓ [calendar] PATCH another user's activity — blocked (404)
+- ✓ [calendar] DELETE another user's activity — blocked (404)
+- ✓ [calendar] PATCH another user's leave — blocked (404)
+- ✓ [calendar] DELETE another user's leave — blocked (404)
+- ✓ [calendar] Id param "1 OR 1=1" does not widen a delete — treated as a bad id (404)
+- ✓ [calendar] Mass assignment of user_id ignored — row was created for the caller, not user 1
+- ✓ [calendar] Oversized note handled (no 500) — handled (200)
+- ✓ [calendar] End date before start date rejected — rejected (400)
+- ✓ [downloader] Downloader API requires a session — returns 401 without a cookie
+- ✓ [downloader] Page scan blocks loopback — blocked (403 BLOCKED_URL)
+- ✓ [downloader] Page scan blocks localhost name — blocked (403 BLOCKED_URL)
+- ✓ [downloader] Page scan blocks decimal IP 2130706433 — blocked (403 BLOCKED_URL)
+- ✓ [downloader] Page scan blocks IPv4-mapped IPv6 — blocked (403 BLOCKED_URL)
+- ✓ [downloader] Page scan blocks 0.0.0.0 — blocked (403 BLOCKED_URL)
+- ✓ [downloader] Page scan blocks cloud metadata — blocked (403 BLOCKED_URL)
+- ✓ [downloader] Page scan blocks private LAN — blocked (403 BLOCKED_URL)
+- ✓ [downloader] Page scan blocks file scheme — blocked (400 BAD_REQUEST)
+- ✓ [downloader] Page scan blocks javascript scheme — blocked (400 BAD_REQUEST)
+- ✓ [downloader] Image-URL download refuses internal addresses — job ran but saved nothing (every URL blocked)
+- ✓ [downloader] Save-to folder rejects /etc — rejected (403 PATH_NOT_ALLOWED)
+- ✓ [downloader] Save-to folder rejects /private/etc — rejected (403 PATH_NOT_ALLOWED)
+- ✓ [downloader] Save-to folder rejects ~/../../etc — rejected (403 PATH_NOT_ALLOWED)
+- ✓ [downloader] Save-to folder rejects ~/.ssh — rejected (403 PATH_NOT_ALLOWED)
+- ✓ [downloader] Save-to folder rejects relative/dir — rejected (400 BAD_REQUEST)
+- ✓ [downloader] Save-to folder rejects /tmp — rejected (403 PATH_NOT_ALLOWED)
+- ✓ [downloader] Download with saveTo=/etc refused before starting — refused (403)
+- ✓ [downloader] Path traversal blocked: album ../ — not found (404)
+- ✓ [downloader] Path traversal blocked: album .env — not found (404)
+- ✓ [downloader] Path traversal blocked: image ../../.env — not found (404)
+- ✓ [downloader] Path traversal blocked: image /etc/passwd — not found (404)
+- ✓ [downloader] Path traversal blocked: unknown external album — not found (404)
+- ✓ [downloader] CRLF header injection via file name — no injected header (404)
+- ✓ [headers] Clickjacking protection — present
+- ✓ [headers] Content-Security-Policy — present
+- ✓ [headers] X-Content-Type-Options: nosniff — present
+- ✓ [headers] Referrer-Policy — present
+- ✓ [headers] X-Powered-By hidden — hidden
+- ✓ [cookies] Session cookie is HttpOnly — HttpOnly set — JS cannot read the session
+- ✓ [cookies] Session cookie SameSite — SameSite set (CSRF mitigation)
+- ✓ [cookies] Session cookie Secure flag — not set on http://localhost by design — set automatically in production
+- ✓ [ratelimit] Login rate limiting / lockout — throttled after 10 attempts (429)
+
+## Injection cheat-sheet
+
+- **SQL injection** (every text field, login, search, and numeric id): `' OR '1'='1' -- `, `1; DROP TABLE users--`, `" UNION SELECT ...--`
+- **Stored XSS** (names, titles, notes, link fields, imported Markdown): `<img src=x onerror=alert(document.cookie)>`, `<svg onload=alert(1)>`, `"><script>alert(1)</script>`, `javascript:alert(1)`
+- **IDOR** (replay every :id / :uuid route with a second account): `/api/tracks/<id>`, `/api/code/<uuid>`, `ids 1,2,3…`
+- **SSRF** (any URL the server fetches): `http://169.254.169.254/`, `http://localhost/`, `file:///etc/passwd`, `https://trusted@attacker/`, `https://trusted.attacker/`
+- **Auth** (every protected endpoint): `no cookie`, `tampered JWT signature`, `{"alg":"none"}`, `expired token`
+- **Uploads** (icon, avatar, task file, code content): `oversized files`, `text/html dressed as image`, `data:text/html,<script>`, `../../ in filenames`
+- **Rate limiting** (login / register / password reset): `25× wrong password`
+- **Time-based blind SQLi** (login, search, ids — a slow reply means the SQL ran): `' OR SLEEP(3) -- `, `1 AND SLEEP(3)`
+- **Path traversal** (album / file names, Save-to folder, screenshot paths): `../../.env`, `..%2F..%2Fetc%2Fpasswd`, `~/../../etc`, `~/.ssh`
+- **SSRF tricks** (Image downloader page scan / image URLs): `http://2130706433/ (decimal 127.0.0.1)`, `http://[::ffff:127.0.0.1]/`, `http://0.0.0.0:3000/`, `http://localhost./`
+- **Header / CRLF injection** (download file names, Content-Disposition): `name%0d%0aSet-Cookie:x=1`, `file"; x=".jpg`
+- **Dangerous links** (link fields, file fields, note links): `javascript:alert(1)`, `data:text/html,<script>alert(1)</script>`, ` javascript:alert(1) (leading space)`

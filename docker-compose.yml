@@ -1,0 +1,26 @@
+# Runs MyTrack on the server. Jenkins uploads this file and .env to
+# DEPLOY_DIR and starts it with IMAGE_TAG set to the build it just shipped.
+#   IMAGE_TAG=<tag> docker compose up -d
+services:
+  mytrack:
+    image: mytrack:${IMAGE_TAG:-latest}
+    container_name: mytrack
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      # Bound to localhost: put Nginx/Caddy (HTTPS) in front of it.
+      # Use "3000:3000" instead to expose it directly.
+      - "127.0.0.1:${HOST_PORT:-3000}:3000"
+    volumes:
+      - mytrack-data:/app/data
+    extra_hosts:
+      # lets DB_HOST=host.docker.internal reach a MySQL running on the server
+      - "host.docker.internal:host-gateway"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  mytrack-data:

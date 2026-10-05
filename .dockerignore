@@ -1,0 +1,25 @@
+# Keep secrets and local data out of the image; config comes from env vars.
+.env
+.env.*
+!.env.example
+credentials/
+public/system-tracker/
+downloads/
+
+# rebuilt inside the image
+node_modules/
+.next/
+public/pdfjs/
+public/tesseract/
+
+# not needed to build or run
+.git/
+.gitignore
+.dockerignore
+Dockerfile
+Jenkinsfile
+docker-compose.yml
+security-report.md
+*.md
+.DS_Store
+*.log

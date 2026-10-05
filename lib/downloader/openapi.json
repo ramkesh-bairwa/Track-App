@@ -1,0 +1,1724 @@
+{
+ "openapi": "3.0.3",
+ "info": {
+  "title": "Image Downloader API",
+  "version": "1.0.0",
+  "description": "Part of MyTrack. Calls from the browser use your MyTrack login; outside tools can send DOWNLOADER_API_TOKEN (if set) as x-api-key, Bearer, or ?token=."
+ },
+ "servers": [
+  {
+   "url": "/",
+   "description": "This MyTrack server"
+  }
+ ],
+ "components": {
+  "securitySchemes": {
+   "ApiKeyHeader": {
+    "type": "apiKey",
+    "in": "header",
+    "name": "x-api-key"
+   },
+   "BearerToken": {
+    "type": "http",
+    "scheme": "bearer"
+   }
+  },
+  "schemas": {
+   "Error": {
+    "type": "object",
+    "properties": {
+     "error": {
+      "type": "object",
+      "properties": {
+       "code": {
+        "type": "string",
+        "example": "BAD_REQUEST"
+       },
+       "message": {
+        "type": "string",
+        "example": "Human-readable description"
+       }
+      }
+     }
+    }
+   },
+   "JobSummary": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "type": {
+      "type": "string",
+      "enum": [
+       "webpage",
+       "pexels"
+      ]
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "queued",
+       "running",
+       "completed",
+       "failed",
+       "cancelled"
+      ]
+     },
+     "album": {
+      "type": "string",
+      "nullable": true,
+      "example": "20260917_143008_cats"
+     },
+     "params": {
+      "type": "object"
+     },
+     "info": {
+      "type": "object"
+     },
+     "total": {
+      "type": "integer"
+     },
+     "completed": {
+      "type": "integer"
+     },
+     "failed": {
+      "type": "integer"
+     },
+     "skipped": {
+      "type": "integer"
+     },
+     "progress": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100
+     },
+     "message": {
+      "type": "string",
+      "nullable": true
+     },
+     "createdAt": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "startedAt": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true
+     },
+     "finishedAt": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true
+     },
+     "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+     }
+    }
+   },
+   "JobDetail": {
+    "allOf": [
+     {
+      "$ref": "#/components/schemas/JobSummary"
+     },
+     {
+      "type": "object",
+      "properties": {
+       "files": {
+        "type": "array",
+        "items": {
+         "type": "object",
+         "properties": {
+          "name": {
+           "type": "string"
+          },
+          "bytes": {
+           "type": "integer"
+          },
+          "contentType": {
+           "type": "string"
+          },
+          "url": {
+           "type": "string"
+          },
+          "sourceUrl": {
+           "type": "string"
+          }
+         }
+        }
+       },
+       "errors": {
+        "type": "array",
+        "items": {
+         "type": "object",
+         "properties": {
+          "url": {
+           "type": "string"
+          },
+          "message": {
+           "type": "string"
+          }
+         }
+        }
+       },
+       "skippedItems": {
+        "type": "array",
+        "items": {
+         "type": "object",
+         "properties": {
+          "url": {
+           "type": "string"
+          },
+          "reason": {
+           "type": "string"
+          }
+         }
+        }
+       }
+      }
+     }
+    ]
+   },
+   "AlbumSummary": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string",
+      "example": "20260917_143008_cats"
+     },
+     "title": {
+      "type": "string",
+      "example": "cats"
+     },
+     "source": {
+      "type": "string",
+      "enum": [
+       "pexels",
+       "webpage",
+       "unknown"
+      ]
+     },
+     "params": {
+      "type": "object",
+      "nullable": true
+     },
+     "imageCount": {
+      "type": "integer"
+     },
+     "totalBytes": {
+      "type": "integer"
+     },
+     "coverUrl": {
+      "type": "string",
+      "nullable": true
+     },
+     "createdAt": {
+      "type": "string",
+      "format": "date-time"
+     }
+    }
+   },
+   "AlbumDetail": {
+    "allOf": [
+     {
+      "$ref": "#/components/schemas/AlbumSummary"
+     },
+     {
+      "type": "object",
+      "properties": {
+       "info": {
+        "type": "object",
+        "nullable": true
+       },
+       "pagination": {
+        "type": "object",
+        "properties": {
+         "page": {
+          "type": "integer"
+         },
+         "limit": {
+          "type": "integer"
+         },
+         "total": {
+          "type": "integer"
+         },
+         "totalPages": {
+          "type": "integer"
+         },
+         "hasNextPage": {
+          "type": "boolean"
+         }
+        }
+       },
+       "images": {
+        "type": "array",
+        "items": {
+         "type": "object",
+         "properties": {
+          "name": {
+           "type": "string"
+          },
+          "bytes": {
+           "type": "integer"
+          },
+          "modifiedAt": {
+           "type": "string",
+           "format": "date-time"
+          },
+          "contentType": {
+           "type": "string"
+          },
+          "url": {
+           "type": "string"
+          },
+          "downloadUrl": {
+           "type": "string"
+          }
+         }
+        }
+       }
+      }
+     }
+    ]
+   },
+   "PexelsPhoto": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "integer"
+     },
+     "width": {
+      "type": "integer"
+     },
+     "height": {
+      "type": "integer"
+     },
+     "alt": {
+      "type": "string",
+      "nullable": true
+     },
+     "avgColor": {
+      "type": "string",
+      "nullable": true
+     },
+     "photographer": {
+      "type": "string"
+     },
+     "photographerUrl": {
+      "type": "string"
+     },
+     "pexelsUrl": {
+      "type": "string"
+     },
+     "src": {
+      "type": "object",
+      "properties": {
+       "original": {
+        "type": "string"
+       },
+       "large2x": {
+        "type": "string"
+       },
+       "large": {
+        "type": "string"
+       },
+       "medium": {
+        "type": "string"
+       },
+       "small": {
+        "type": "string"
+       },
+       "portrait": {
+        "type": "string"
+       },
+       "landscape": {
+        "type": "string"
+       },
+       "tiny": {
+        "type": "string"
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ "paths": {
+  "/api/downloader/health": {
+   "get": {
+    "tags": [
+     "Phase 1 — Foundation"
+    ],
+    "summary": "Health check",
+    "description": "Public endpoint — no auth required.",
+    "responses": {
+     "200": {
+      "description": "Server is up",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "status": {
+           "type": "string",
+           "example": "ok"
+          },
+          "uptimeSeconds": {
+           "type": "integer"
+          },
+          "time": {
+           "type": "string",
+           "format": "date-time"
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/downloader/config": {
+   "get": {
+    "tags": [
+     "Phase 1 — Foundation"
+    ],
+    "summary": "App configuration & available options",
+    "security": [
+     {
+      "ApiKeyHeader": []
+     },
+     {
+      "BearerToken": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Current server configuration",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "authRequired": {
+           "type": "boolean"
+          },
+          "pexels": {
+           "type": "object",
+           "properties": {
+            "configured": {
+             "type": "boolean"
+            },
+            "maxCount": {
+             "type": "integer"
+            },
+            "qualities": {
+             "type": "array",
+             "items": {
+              "type": "object",
+              "properties": {
+               "key": {
+                "type": "string"
+               },
+               "label": {
+                "type": "string"
+               }
+              }
+             }
+            },
+            "defaultQuality": {
+             "type": "string"
+            },
+            "orientations": {
+             "type": "array",
+             "items": {
+              "type": "string"
+             }
+            },
+            "sizes": {
+             "type": "array",
+             "items": {
+              "type": "string"
+             }
+            }
+           }
+          },
+          "webpage": {
+           "type": "object",
+           "properties": {
+            "maxImages": {
+             "type": "integer"
+            }
+           }
+          },
+          "limits": {
+           "type": "object",
+           "properties": {
+            "maxImageBytes": {
+             "type": "integer"
+            },
+            "downloadConcurrency": {
+             "type": "integer"
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/downloader/paths/check": {
+   "post": {
+    "tags": [
+     "Phase 1 — Foundation"
+    ],
+    "summary": "Check a Save-to folder without creating it",
+    "security": [
+     {
+      "ApiKeyHeader": []
+     },
+     {
+      "BearerToken": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "path"
+        ],
+        "properties": {
+         "path": {
+          "type": "string",
+          "example": "~/Pictures/cats"
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Resolved folder",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "path": {
+           "type": "string"
+          },
+          "exists": {
+           "type": "boolean"
+          },
+          "writable": {
+           "type": "boolean"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Bad path",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "Outside the allowed folders",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/downloader/webpage/scan": {
+   "post": {
+    "tags": [
+     "Phase 2 & 3 — Webpage"
+    ],
+    "summary": "Scan a web page and return all found image URLs",
+    "security": [
+     {
+      "ApiKeyHeader": []
+     },
+     {
+      "BearerToken": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "url"
+        ],
+        "properties": {
+         "url": {
+          "type": "string",
+          "example": "https://unsplash.com"
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "List of images found on the page",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "url": {
+           "type": "string"
+          },
+          "finalUrl": {
+           "type": "string"
+          },
+          "title": {
+           "type": "string",
+           "nullable": true
+          },
+          "total": {
+           "type": "integer"
+          },
+          "truncated": {
+           "type": "boolean"
+          },
+          "images": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "url": {
+              "type": "string"
+             },
+             "source": {
+              "type": "string",
+              "example": "img"
+             },
+             "alt": {
+              "type": "string",
+              "nullable": true
+             },
+             "width": {
+              "type": "integer",
+              "nullable": true
+             },
+             "height": {
+              "type": "integer",
+              "nullable": true
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Invalid URL",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "502": {
+      "description": "Could not fetch the page",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/downloader/webpage/download": {
+   "post": {
+    "tags": [
+     "Phase 2 & 3 — Webpage"
+    ],
+    "summary": "Start a download job for images on a web page",
+    "description": "Provide `url` to download every image found on the page, **or** `imageUrls` to download only specific images. Returns `202 Accepted` with a job object — poll `/api/downloader/jobs/:id` or stream `/api/downloader/jobs/:id/events` for progress.",
+    "security": [
+     {
+      "ApiKeyHeader": []
+     },
+     {
+      "BearerToken": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "url": {
+          "type": "string",
+          "example": "https://unsplash.com"
+         },
+         "imageUrls": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          },
+          "example": [
+           "https://example.com/a.jpg"
+          ]
+         },
+         "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500,
+          "example": 100
+         },
+         "minBytes": {
+          "type": "integer",
+          "minimum": 0,
+          "example": 5000,
+          "description": "Skip images smaller than this size in bytes"
+         },
+         "albumName": {
+          "type": "string",
+          "example": "my-album"
+         },
+         "saveTo": {
+          "type": "string",
+          "example": "~/Pictures/wallpapers",
+          "description": "Folder to save into (absolute or ~/…, inside your home folder or /Volumes). Created if missing. Omit to use the project downloads/ folder."
+         },
+         "subfolder": {
+          "type": "boolean",
+          "default": true,
+          "description": "With saveTo: put this download in its own new <date>_<title> subfolder. false saves straight into saveTo."
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "202": {
+      "description": "Job created and running in background",
+      "headers": {
+       "Location": {
+        "schema": {
+         "type": "string"
+        },
+        "description": "/api/downloader/jobs/:id"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JobSummary"
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/downloader/pexels/search": {
+   "get": {
+    "tags": [
+     "Phase 2 & 3 — Pexels"
+    ],
+    "summary": "Search Pexels photos (preview only, no download)",
+    "security": [
+     {
+      "ApiKeyHeader": []
+     },
+     {
+      "BearerToken": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "query",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "example": "cats"
+     },
+     {
+      "name": "page",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "default": 1
+      }
+     },
+     {
+      "name": "perPage",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "default": 30,
+       "minimum": 1,
+       "maximum": 80
+      }
+     },
+     {
+      "name": "orientation",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "enum": [
+        "landscape",
+        "portrait",
+        "square"
+       ]
+      }
+     },
+     {
+      "name": "size",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "enum": [
+        "large",
+        "medium",
+        "small"
+       ]
+      }
+     },
+     {
+      "name": "color",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "example": "red"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Pexels search results",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "query": {
+           "type": "string"
+          },
+          "page": {
+           "type": "integer"
+          },
+          "perPage": {
+           "type": "integer"
+          },
+          "totalResults": {
+           "type": "integer"
+          },
+          "hasNextPage": {
+           "type": "boolean"
+          },
+          "photos": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/PexelsPhoto"
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "503": {
+      "description": "Pexels API key not configured",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/downloader/pexels/download": {
+   "post": {
+    "tags": [
+     "Phase 2 & 3 — Pexels"
+    ],
+    "summary": "Start a Pexels download job",
+    "description": "Searches Pexels for `count` photos and downloads them. Returns `202 Accepted` with a job object.",
+    "security": [
+     {
+      "ApiKeyHeader": []
+     },
+     {
+      "BearerToken": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "query"
+        ],
+        "properties": {
+         "query": {
+          "type": "string",
+          "example": "cats"
+         },
+         "count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "example": 50
+         },
+         "quality": {
+          "type": "string",
+          "enum": [
+           "original",
+           "large2x",
+           "large",
+           "medium",
+           "small",
+           "portrait",
+           "landscape",
+           "tiny"
+          ],
+          "default": "original"
+         },
+         "orientation": {
+          "type": "string",
+          "enum": [
+           "landscape",
+           "portrait",
+           "square"
+          ]
+         },
+         "size": {
+          "type": "string",
+          "enum": [
+           "large",
+           "medium",
+           "small"
+          ]
+         },
+         "color": {
+          "type": "string",
+          "example": "blue"
+         },
+         "albumName": {
+          "type": "string",
+          "example": "cats"
+         },
+         "saveTo": {
+          "type": "string",
+          "example": "~/Pictures/wallpapers",
+          "description": "Folder to save into (absolute or ~/…, inside your home folder or /Volumes). Created if missing. Omit to use the project downloads/ folder."
+         },
+         "subfolder": {
+          "type": "boolean",
+          "default": true,
+          "description": "With saveTo: put this download in its own new <date>_<title> subfolder. false saves straight into saveTo."
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "202": {
+      "description": "Job created",
+      "headers": {
+       "Location": {
+        "schema": {
+         "type": "string"
+        },
+        "description": "/api/downloader/jobs/:id"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JobSummary"
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "503": {
+      "description": "Pexels API key not configured",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/downloader/urls/download": {
+   "post": {
+    "tags": [
+     "Phase 3 — Download"
+    ],
+    "summary": "Download images from their direct URLs (starts a job)",
+    "security": [
+     {
+      "ApiKeyHeader": []
+     },
+     {
+      "BearerToken": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "urls"
+        ],
+        "properties": {
+         "urls": {
+          "oneOf": [
+           {
+            "type": "array",
+            "items": {
+             "type": "string",
+             "format": "uri"
+            }
+           },
+           {
+            "type": "string",
+            "description": "One URL per line"
+           }
+          ],
+          "example": [
+           "https://images.pexels.com/photos/417074/pexels-photo-417074.jpeg"
+          ]
+         },
+         "albumName": {
+          "type": "string"
+         },
+         "minBytes": {
+          "type": "integer",
+          "minimum": 0
+         },
+         "saveTo": {
+          "type": "string",
+          "example": "~/Pictures/wallpapers",
+          "description": "Folder to save into (absolute or ~/…, inside your home folder or /Volumes). Created if missing. Omit to use the project downloads/ folder."
+         },
+         "subfolder": {
+          "type": "boolean",
+          "default": true,
+          "description": "With saveTo: put this download in its own new <date>_<title> subfolder. false saves straight into saveTo."
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "202": {
+      "description": "Job started",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JobSummary"
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Bad request",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "Folder not allowed / not writable",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/downloader/jobs": {
+   "get": {
+    "tags": [
+     "Phase 4 — Jobs"
+    ],
+    "summary": "List all jobs",
+    "security": [
+     {
+      "ApiKeyHeader": []
+     },
+     {
+      "BearerToken": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "status",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "enum": [
+        "queued",
+        "running",
+        "completed",
+        "failed",
+        "cancelled"
+       ]
+      }
+     },
+     {
+      "name": "type",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "enum": [
+        "pexels",
+        "webpage"
+       ]
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Array of job summaries (newest first)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "jobs": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/JobSummary"
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/downloader/jobs/{id}": {
+   "get": {
+    "tags": [
+     "Phase 4 — Jobs"
+    ],
+    "summary": "Get full job details (files, errors, skipped)",
+    "security": [
+     {
+      "ApiKeyHeader": []
+     },
+     {
+      "BearerToken": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Job detail",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JobDetail"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Job not found",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/downloader/jobs/{id}/events": {
+   "get": {
+    "tags": [
+     "Phase 4 — Jobs"
+    ],
+    "summary": "Live progress via Server-Sent Events (SSE)",
+    "description": "Streams `progress` events on every change, a `file` event for each saved image, and a final `done` event. Keep the connection open until `done` is received.",
+    "security": [
+     {
+      "ApiKeyHeader": []
+     },
+     {
+      "BearerToken": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "SSE stream (`text/event-stream`)",
+      "content": {
+       "text/event-stream": {
+        "schema": {
+         "type": "string",
+         "example": "event: progress\ndata: {\"status\":\"running\",\"completed\":3,\"total\":10,\"progress\":30}\n\nevent: file\ndata: {\"name\":\"cats_1.jpg\",\"bytes\":84321,\"url\":\"/api/downloader/albums/...\"}\n\nevent: done\ndata: {\"status\":\"completed\",\"progress\":100}\n\n"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Job not found",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/downloader/jobs/{id}/cancel": {
+   "post": {
+    "tags": [
+     "Phase 4 — Jobs"
+    ],
+    "summary": "Cancel a running job",
+    "security": [
+     {
+      "ApiKeyHeader": []
+     },
+     {
+      "BearerToken": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Updated job summary",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JobSummary"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Job not found",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/downloader/albums": {
+   "get": {
+    "tags": [
+     "Phase 5 — Albums"
+    ],
+    "summary": "List all downloaded albums",
+    "security": [
+     {
+      "ApiKeyHeader": []
+     },
+     {
+      "BearerToken": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "includeEmpty",
+      "in": "query",
+      "schema": {
+       "type": "boolean",
+       "default": false
+      },
+      "description": "Include albums with no images"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Array of albums (newest first)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "albums": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/AlbumSummary"
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/downloader/albums/{album}": {
+   "get": {
+    "tags": [
+     "Phase 5 — Albums"
+    ],
+    "summary": "Get album details with paginated images",
+    "security": [
+     {
+      "ApiKeyHeader": []
+     },
+     {
+      "BearerToken": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "album",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "example": "20260917_143008_cats"
+     },
+     {
+      "name": "page",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "default": 1
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "default": 50,
+       "minimum": 1,
+       "maximum": 500
+      }
+     },
+     {
+      "name": "sort",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "enum": [
+        "name",
+        "newest",
+        "largest"
+       ],
+       "default": "name"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Album detail with images",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AlbumDetail"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Album not found",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "Phase 5 — Albums"
+    ],
+    "summary": "Delete an album and all its images",
+    "security": [
+     {
+      "ApiKeyHeader": []
+     },
+     {
+      "BearerToken": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "album",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Deleted"
+     },
+     "404": {
+      "description": "Album not found",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/downloader/albums/{album}/images/{filename}": {
+   "get": {
+    "tags": [
+     "Phase 5 — Albums"
+    ],
+    "summary": "Serve or download a single image",
+    "description": "Add `?download=1` to force a file download instead of inline display.",
+    "security": [
+     {
+      "ApiKeyHeader": []
+     },
+     {
+      "BearerToken": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "album",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "filename",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "example": "cats_1.jpg"
+     },
+     {
+      "name": "download",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "enum": [
+        0,
+        1
+       ]
+      },
+      "description": "Set to 1 to force download"
+     },
+     {
+      "name": "token",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "API token (useful for <img src> tags)"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Image file",
+      "content": {
+       "image/*": {
+        "schema": {
+         "type": "string",
+         "format": "binary"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Image not found",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "Phase 5 — Albums"
+    ],
+    "summary": "Delete a single image from an album",
+    "security": [
+     {
+      "ApiKeyHeader": []
+     },
+     {
+      "BearerToken": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "album",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "filename",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Deleted"
+     },
+     "404": {
+      "description": "Image not found",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/downloader/albums/{album}/zip": {
+   "get": {
+    "tags": [
+     "Phase 5 — Albums"
+    ],
+    "summary": "Download entire album as a ZIP file",
+    "security": [
+     {
+      "ApiKeyHeader": []
+     },
+     {
+      "BearerToken": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "album",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "ZIP archive",
+      "content": {
+       "application/zip": {
+        "schema": {
+         "type": "string",
+         "format": "binary"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Album not found",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/downloader/albums/{album}/reveal": {
+   "post": {
+    "tags": [
+     "Phase 5 — Albums"
+    ],
+    "summary": "Open the album folder in Finder / Explorer (server machine)",
+    "security": [
+     {
+      "ApiKeyHeader": []
+     },
+     {
+      "BearerToken": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "album",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Opened",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "opened": {
+           "type": "boolean"
+          },
+          "path": {
+           "type": "string"
+          }
+         }
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Album not found",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ "tags": []
+}

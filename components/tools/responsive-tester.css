@@ -1,0 +1,235 @@
+/* Responsive Tester (components/tools/ResponsiveTester.js) */
+.rt-url-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+.rt-url {
+  flex: 1;
+  min-width: 0;
+}
+.rt-url-row .btn {
+  height: 38px;
+  white-space: nowrap;
+}
+.rt-devices {
+  margin: 14px 0 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+.rt-device-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.rt-device {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+.rt-device label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  cursor: pointer;
+}
+.rt-device input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+.rt-device .tool-mono {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.rt-device.on {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--accent-text);
+}
+.rt-device.on .tool-mono {
+  color: inherit;
+  opacity: 0.8;
+}
+.rt-device-remove {
+  margin: 0 6px 0 -4px;
+  padding: 2px 5px;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+.rt-device-remove:hover {
+  background: var(--danger-dim);
+  color: var(--danger);
+}
+.rt-custom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+.rt-custom .input {
+  width: 96px;
+  padding: 5px 8px;
+  font-size: 12.5px;
+}
+.rt-custom .input:first-child {
+  width: 150px;
+}
+.rt a.btn {
+  text-decoration: none;
+}
+.rt-draft-error {
+  color: var(--danger);
+  font-size: 12px;
+}
+
+.rt-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px 14px;
+  margin-bottom: 12px;
+}
+.rt-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.rt-status .tool-badge {
+  font-weight: 500;
+  white-space: normal;
+}
+.rt-status .tool-mono {
+  word-break: break-all;
+}
+.rt-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.rt-zoom .input {
+  width: auto;
+  padding: 5px 8px;
+  font-size: 12.5px;
+}
+
+.rt-refused {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.rt-refused h2 {
+  margin-bottom: 6px;
+}
+.rt-refused p {
+  margin: 0 0 12px;
+  line-height: 1.5;
+}
+.rt-refused-icon {
+  font-size: 22px;
+  color: var(--danger);
+  margin-top: 2px;
+}
+
+/* Frames sit side by side and scroll sideways. */
+.rt-canvas {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  overflow-x: auto;
+  padding: 14px;
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg) radial-gradient(color-mix(in srgb, var(--text) 9%, transparent) 1px, transparent 1px) 0 0 / 18px 18px;
+}
+.rt-frame {
+  flex-shrink: 0;
+  margin: 0;
+}
+.rt-frame-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  margin-bottom: 6px;
+}
+.rt-frame-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.rt-frame-title i {
+  color: var(--text-faint);
+}
+.rt-frame-title .tool-mono {
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+.rt-frame-actions {
+  display: flex;
+  flex-shrink: 0;
+}
+.rt-frame-actions .btn {
+  padding: 5px 8px;
+}
+.rt-screen {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.18);
+  box-sizing: content-box;
+}
+.rt-screen iframe {
+  display: block;
+  border: 0;
+  transform-origin: 0 0;
+  background: #fff;
+}
+.rt-hint {
+  display: flex;
+  gap: 7px;
+  line-height: 1.5;
+}
+.rt-hint i {
+  margin-top: 3px;
+}
+
+@media (max-width: 600px) {
+  .rt-url-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .rt-url-row .btn {
+    justify-content: center;
+  }
+  .rt-canvas {
+    padding: 10px;
+  }
+  .rt-custom .input {
+    width: calc(50% - 14px);
+  }
+  .rt-custom .input:first-child {
+    width: 100%;
+  }
+}
