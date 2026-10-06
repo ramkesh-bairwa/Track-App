@@ -8,6 +8,7 @@ import PrivacyModal from '@/components/PrivacyModal';
 import AppearanceModal from '@/components/AppearanceModal';
 import BackupModal from '@/components/BackupModal';
 import AccessibilityModal from '@/components/AccessibilityModal';
+import DataTransferModal from '@/components/DataTransferModal';
 
 export default function ProfileMenu({ user }) {
   const router = useRouter();
@@ -18,6 +19,7 @@ export default function ProfileMenu({ user }) {
   const [showAppearance, setShowAppearance] = useState(false);
   const [showBackup, setShowBackup] = useState(false);
   const [showAccessibility, setShowAccessibility] = useState(false);
+  const [showData, setShowData] = useState(false);
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -111,6 +113,16 @@ export default function ProfileMenu({ user }) {
             className="profile-menu-item"
             onClick={() => {
               setOpen(false);
+              setShowData(true);
+            }}
+          >
+            Export / import data
+          </button>
+          <button
+            type="button"
+            className="profile-menu-item"
+            onClick={() => {
+              setOpen(false);
               router.push('/dashboard/login-history');
             }}
           >
@@ -127,7 +139,7 @@ export default function ProfileMenu({ user }) {
       )}
 
       {/* Rendered at the page root, so the top bar's own color settings don't leak into them. */}
-      {(showProfile || showPrivacy || showAccessibility || showBackup || showAppearance) &&
+      {(showProfile || showPrivacy || showAccessibility || showBackup || showAppearance || showData) &&
         createPortal(
           <>
             {showProfile && (
@@ -152,6 +164,7 @@ export default function ProfileMenu({ user }) {
               />
             )}
             {showBackup && <BackupModal user={currentUser} onClose={() => setShowBackup(false)} />}
+            {showData && <DataTransferModal onClose={() => setShowData(false)} />}
             {showAppearance && (
               <AppearanceModal
                 user={currentUser}
