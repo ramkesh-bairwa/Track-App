@@ -8160,3 +8160,28 @@ button.note-tag {
     width: min(300px, calc(100vw - 24px));
   }
 }
+
+/* Top loading line (components/TopLoader.js) */
+.top-loader {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 10000;
+  pointer-events: none;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent), 0 0 4px var(--accent);
+  transform: scaleX(0);
+  transform-origin: left center;
+  opacity: 0;
+  transition: transform 200ms ease, opacity 300ms ease;
+}
+.top-loader.is-active {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .top-loader {
+    transition: opacity 300ms ease;
+  }
+}

@@ -1,5 +1,6 @@
 import './globals.css';
 import TouchDoubleTap from '@/components/TouchDoubleTap';
+import TopLoader from '@/components/TopLoader';
 
 export const metadata = {
   title: 'MyTrack',
@@ -44,6 +45,7 @@ export default function RootLayout({ children }) {
         />
       </head>
       <body>
+        <TopLoader />
         {children}
         <TouchDoubleTap />
       </body>
