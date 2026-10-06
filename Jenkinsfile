@@ -31,7 +31,7 @@ pipeline {
     string(name: 'DEPLOY_HOST', defaultValue: '187.126.117.103', description: 'Server to deploy to (hostname or IP)')
     string(name: 'DEPLOY_DIR', defaultValue: '/var/www/mytrack', description: 'Folder on the server for docker-compose.yml and .env')
     string(name: 'SSH_PORT', defaultValue: '22', description: 'SSH port on the server')
-    string(name: 'DOMAIN', defaultValue: 'mytrack.glamofashion.com', description: 'Public domain (Nginx site + Let\'s Encrypt certificate)')
+    string(name: 'DOMAIN', defaultValue: 'my-track.glamofashion.com', description: 'Public domain (Nginx site + Let\'s Encrypt certificate)')
     string(name: 'APP_PORT', defaultValue: '3006', description: 'Port on the server\'s localhost the container listens on (must be free: gsm-samiti uses 3005)')
     booleanParam(name: 'RUN_MIGRATIONS', defaultValue: false, description: 'Apply scripts/schema.sql before starting (MariaDB only — the schema uses MariaDB syntax)')
     booleanParam(name: 'DEPLOY', defaultValue: true, description: 'Untick to only build and test the image')
@@ -120,10 +120,10 @@ pipeline {
             $SSH bash -se <<EOF
               set -e
               # First deploy only: Nginx site for the domain, then a Let's Encrypt certificate
-              if [ ! -f /etc/nginx/sites-available/$APP_NAME ]; then
+              if [ ! -f /etc/nginx/sites-available/$DOMAIN ]; then
                 sed -e "s/__DOMAIN__/$DOMAIN/g" -e "s/__PORT__/$APP_PORT/g" \
-                    "$DEPLOY_DIR/mytrack.conf" > /etc/nginx/sites-available/$APP_NAME
-                ln -sf /etc/nginx/sites-available/$APP_NAME /etc/nginx/sites-enabled/$APP_NAME
+                    "$DEPLOY_DIR/mytrack.conf" > /etc/nginx/sites-available/$DOMAIN
+                ln -sf /etc/nginx/sites-available/$DOMAIN /etc/nginx/sites-enabled/$DOMAIN
                 nginx -t
                 systemctl reload nginx
               fi
