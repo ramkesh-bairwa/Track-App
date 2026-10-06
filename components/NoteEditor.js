@@ -270,8 +270,13 @@ export default function NoteEditor({ content, editable = true, onUpdate, onEdito
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [content, editor]);
 
+  const wasEditableRef = useRef(editable);
   useEffect(() => {
-    if (editor) editor.setEditable(editable && !locked);
+    if (!editor) return;
+    editor.setEditable(editable && !locked, false); // false: toggling edit mode is not a content change
+    // Switching a read-only note to edit mode puts the cursor in it right away.
+    if (editable && !wasEditableRef.current && !locked) editor.commands.focus('end');
+    wasEditableRef.current = editable;
   }, [editor, editable, locked]);
 
   // Format painter: after copying, the next selection gets those marks.

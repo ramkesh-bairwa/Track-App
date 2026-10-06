@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { DATE_LOCALE } from '@/lib/dateLocale';
+import NoteDeleteModal from '@/components/notes/NoteDeleteModal';
 
 function isPlain(style) {
   try {
@@ -31,6 +32,14 @@ export default function NoteCard({ note, query, trail }) {
   const [title, setTitle] = useState(note.title);
   const [draft, setDraft] = useState(note.title);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  // The card itself is a link; its buttons must not also open the note.
+  const stop = (fn) => (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    fn();
+  };
 
   async function saveTitle() {
     const trimmed = draft.trim();
@@ -58,6 +67,7 @@ export default function NoteCard({ note, query, trail }) {
   }
 
   return (
+    <>
     <Link href={`/dashboard/notes/${note.uuid}`} className="track-card note-card">
       {trail && <span className="track-card-path">{trail}</span>}
       <div className="track-card-top">
@@ -94,6 +104,30 @@ export default function NoteCard({ note, query, trail }) {
         <span>{formatDate(note.updated_at || note.created_at)}</span>
         {note.child_count > 0 && <span>{note.child_count} sub-note{note.child_count === 1 ? '' : 's'}</span>}
       </div>
+      <div className="note-card-actions">
+        <button
+          type="button"
+          className="btn btn-sm"
+          onClick={stop(() => router.push(`/dashboard/notes/${note.uuid}?edit=1`))}
+        >
+          ✏️ Edit
+        </button>
+        <button type="button" className="btn btn-sm btn-danger" onClick={stop(() => setDeleting(true))}>
+          🗑 Delete
+        </button>
+      </div>
     </Link>
+    {deleting && (
+      <NoteDeleteModal
+        note={{ id: note.id, title }}
+        hasSubnotes={note.child_count > 0}
+        onDeleted={() => {
+          setDeleting(false);
+          router.refresh();
+        }}
+        onCancel={() => setDeleting(false)}
+      />
+    )}
+    </>
   );
 }

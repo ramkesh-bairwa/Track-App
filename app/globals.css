@@ -8185,3 +8185,42 @@ button.note-tag {
     transition: opacity 300ms ease;
   }
 }
+
+/* Note view mode (components/NoteView.js): the saved note reads like a page —
+   no editor frame, toolbar or status bar until "Edit" is pressed. */
+.note-view-mode .note-editor {
+  border-color: transparent;
+  background: transparent;
+}
+.note-view-mode .note-statusbar {
+  display: none;
+}
+.note-view-mode .note-content-wrap .ProseMirror {
+  outline: none;
+  caret-color: transparent;
+}
+.note-plain-view {
+  margin: 0;
+  padding: 12px 14px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  tab-size: 4;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: inherit;
+  background: var(--bg);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+}
+
+/* Edit / Delete on each note card (components/NoteCard.js) */
+.note-card-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+.note-card-actions .btn {
+  flex: 1;
+  justify-content: center;
+}

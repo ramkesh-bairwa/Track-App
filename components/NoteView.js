@@ -9,11 +9,15 @@ import NoteCard from '@/components/NoteCard';
 import NewNoteModal from '@/components/NewNoteModal';
 import NotePageStyleModal from '@/components/NotePageStyleModal';
 import ConfirmModal from '@/components/ConfirmModal';
+import NoteDeleteModal from '@/components/notes/NoteDeleteModal';
 import { exportNoteAsWord, exportNoteAsExcel, exportNoteAsImage, printNoteAsPdf } from '@/lib/noteExport';
 import { exportNoteAsText, exportNoteAsCsv } from '@/lib/noteExportText';
 import { jsonToText } from '@/lib/noteMarkdown';
 
 const escapeHtml = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+// Empty (or just "<p></p>") notes open straight in the editor; anything else opens to read.
+const isEmptyNote = (c) => !c || !c.replace(/<(?!img|hr|table)[^>]*>/gi, '').replace(/&nbsp;/g, ' ').trim();
 
 function parseStyle(raw) {
   if (!raw) return null;
@@ -47,7 +51,7 @@ function download(text, name) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export default function NoteView({ note, breadcrumbs, subnotes }) {
+export default function NoteView({ note, breadcrumbs, subnotes, startEditing = false }) {
   const router = useRouter();
   const printAreaRef = useRef(null);
   const jsonRef = useRef(null);
@@ -64,6 +68,10 @@ export default function NoteView({ note, breadcrumbs, subnotes }) {
   const [showStyle, setShowStyle] = useState(false);
   const [confirmState, setConfirmState] = useState(null);
   const [exportOpen, setExportOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [editing, setEditing] = useState(() => startEditing || isEmptyNote(note.content));
+  const editingRef = useRef(editing);
+  editingRef.current = editing;
 
   useEffect(() => {
     if (!exportOpen) return undefined;
@@ -157,9 +165,18 @@ export default function NoteView({ note, breadcrumbs, subnotes }) {
     }
   }
 
+  function finishEditing() {
+    saveNow();
+    setEditing(false);
+    // opened via a card's "Edit" (?edit=1): drop it so a reload shows the note to read
+    if (window.location.search) window.history.replaceState(window.history.state, '', window.location.pathname);
+  }
+
   function handleEditorUpdate(html, json) {
-    setContent(html);
     jsonRef.current = json;
+    // The read-only view only re-serialises the stored HTML (e.g. <b> → <strong>); that isn't an edit.
+    if (!editingRef.current) return;
+    setContent(html);
     scheduleSave({ content: html });
   }
 
@@ -191,25 +208,15 @@ export default function NoteView({ note, breadcrumbs, subnotes }) {
     router.refresh();
   }
 
-  function handleDelete() {
-    setConfirmState({
-      title: `Delete "${title}"?`,
-      message:
-        subnotes && subnotes.length > 0
-          ? 'Everything in it — including all its sub-notes — will be deleted. This cannot be undone.'
-          : 'This cannot be undone.',
-      confirmLabel: 'Delete note',
-      danger: true,
-      onConfirm: async () => {
-        await fetch(`/api/notes/${note.id}`, { method: 'DELETE' });
-        if (breadcrumbs && breadcrumbs.length > 1) {
-          router.push(`/dashboard/notes/${breadcrumbs[breadcrumbs.length - 2].uuid}`);
-        } else {
-          router.push('/dashboard/notes');
-        }
-        router.refresh();
-      },
-    });
+  function handleDeleted() {
+    pendingRef.current = null; // nothing left to save
+    setDeleting(false);
+    if (breadcrumbs && breadcrumbs.length > 1) {
+      router.push(`/dashboard/notes/${breadcrumbs[breadcrumbs.length - 2].uuid}`);
+    } else {
+      router.push('/dashboard/notes');
+    }
+    router.refresh();
   }
 
   const pageStyle = {
@@ -265,9 +272,12 @@ export default function NoteView({ note, breadcrumbs, subnotes }) {
               </span>
             )}
           </h1>
-          <p className="note-save-status">
-            {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'unsaved' ? 'Unsaved changes' : 'Saved'}
-          </p>
+          {(editing || saveStatus !== 'saved') && (
+            <p className="note-save-status">
+              {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'unsaved' ? 'Unsaved changes' : 'Saved'}
+            </p>
+          )}
+          {editing && (
           <div className="tabs note-mode-tabs" role="tablist" aria-label="Editor type">
             <button
               type="button"
@@ -290,8 +300,14 @@ export default function NoteView({ note, breadcrumbs, subnotes }) {
               {'</>'} Plain text
             </button>
           </div>
+          )}
         </div>
         <div className="page-head-actions">
+          {editing ? (
+            <button type="button" className="btn btn-primary" onClick={finishEditing}>✓ Done</button>
+          ) : (
+            <button type="button" className="btn btn-primary" onClick={() => setEditing(true)}>✏️ Edit</button>
+          )}
           <button type="button" className="btn" onClick={() => setShowNewSub(true)}>＋ Sub-note</button>
           <button type="button" className="btn" onClick={() => setShowStyle(true)}>🎨 Page style</button>
           <div className="note-export-menu" ref={exportMenuRef}>
@@ -326,7 +342,7 @@ export default function NoteView({ note, breadcrumbs, subnotes }) {
               </div>
             )}
           </div>
-          <button type="button" className="btn btn-danger" onClick={handleDelete}>Delete</button>
+          <button type="button" className="btn btn-danger" onClick={() => setDeleting(true)}>🗑 Delete</button>
         </div>
       </div>
 
@@ -340,12 +356,19 @@ export default function NoteView({ note, breadcrumbs, subnotes }) {
         </div>
       )}
 
-      <div className="note-print-area" ref={printAreaRef} style={pageStyle}>
-        {plain ? (
+      <div
+        className={`note-print-area${editing ? '' : ' note-view-mode'}`}
+        ref={printAreaRef}
+        style={pageStyle}
+      >
+        {plain && !editing ? (
+          <pre className="note-plain-view">{content}</pre>
+        ) : plain ? (
           <NotePlainEditor content={content} onUpdate={handlePlainUpdate} onSaveNow={() => saveNow()} fileName={title} />
         ) : (
           <NoteEditor
             content={content}
+            editable={editing}
             onUpdate={handleEditorUpdate}
             onSaveNow={() => saveNow()}
             fileName={title}
@@ -362,6 +385,14 @@ export default function NoteView({ note, breadcrumbs, subnotes }) {
         <NotePageStyleModal style={style} onClose={() => setShowStyle(false)} onSave={handleSaveStyle} />
       )}
       {confirmState && <ConfirmModal {...confirmState} onClose={() => setConfirmState(null)} />}
+      {deleting && (
+        <NoteDeleteModal
+          note={{ id: note.id, title }}
+          hasSubnotes={subnotes?.length > 0}
+          onDeleted={handleDeleted}
+          onCancel={() => setDeleting(false)}
+        />
+      )}
     </>
   );
 }
