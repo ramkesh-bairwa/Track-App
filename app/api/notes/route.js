@@ -4,6 +4,14 @@ import { query } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { withApiErrors } from '@/lib/apiError';
 
+// Every note's title, for linking one note from another.
+export const GET = withApiErrors(async () => {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const notes = await query('SELECT uuid, title FROM notes WHERE user_id = ? ORDER BY updated_at DESC, id DESC', [user.id]);
+  return NextResponse.json({ notes });
+});
+
 export const POST = withApiErrors(async (request) => {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

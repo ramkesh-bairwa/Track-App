@@ -240,7 +240,7 @@ export default function NoteView({ note, breadcrumbs, subnotes }) {
         </div>
       )}
 
-      <div className="page-head">
+      <div className="page-head note-head">
         <div>
           <h1>
             {editingTitle ? (
@@ -349,6 +349,7 @@ export default function NoteView({ note, breadcrumbs, subnotes }) {
             onUpdate={handleEditorUpdate}
             onSaveNow={() => saveNow()}
             fileName={title}
+            noteId={note.id}
             onEditorReady={(editor) => {
               if (!jsonRef.current) jsonRef.current = editor.getJSON();
             }}

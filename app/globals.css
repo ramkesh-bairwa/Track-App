@@ -7670,3 +7670,493 @@ button.tasks-menu-trigger {
   font-size: 11.5px;
   color: var(--text-muted);
 }
+
+/* ==================== Note editor: extra features ==================== */
+/* text effects */
+.note-content-wrap .note-kbd,
+.note-kbd {
+  display: inline-block;
+  padding: 0 6px;
+  margin: 0 1px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--panel-raised);
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  line-height: 1.5;
+}
+.note-spoiler {
+  filter: blur(5px);
+  background: var(--panel-raised);
+  border-radius: 3px;
+  transition: filter 0.15s;
+}
+.note-spoiler:hover,
+.ProseMirror-focused .note-spoiler:focus-within {
+  filter: none;
+}
+.note-tag {
+  display: inline-block;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 0.82em;
+  font-weight: 600;
+  line-height: 1.6;
+  border: 1px solid transparent;
+  --tag: #8b93a5;
+  background: color-mix(in srgb, var(--tag) 18%, transparent);
+  color: color-mix(in srgb, var(--tag) 75%, var(--text));
+}
+button.note-tag {
+  cursor: pointer;
+  font-family: inherit;
+}
+.note-tag[data-tag='green'] { --tag: #2fb380; }
+.note-tag[data-tag='blue'] { --tag: #4f86f0; }
+.note-tag[data-tag='yellow'] { --tag: #d9a21b; }
+.note-tag[data-tag='red'] { --tag: #e5646b; }
+.note-tag[data-tag='purple'] { --tag: #a26cf0; }
+.note-tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 8px 8px;
+}
+
+/* block styles */
+.note-content-wrap .note-dropcap::first-letter {
+  float: left;
+  font-size: 3.2em;
+  line-height: 0.85;
+  font-weight: 700;
+  margin: 0.06em 0.12em 0 0;
+  color: var(--accent-text);
+}
+.note-content-wrap .note-accentbar {
+  border-left: 4px solid var(--accent);
+  padding-left: 12px;
+}
+.note-content-wrap .note-boxed {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+}
+.note-content-wrap [data-shade] {
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  color: #1a1d24;
+}
+.note-content-wrap blockquote[data-style='pull'] {
+  border-left: none;
+  border-top: 2px solid var(--accent);
+  border-bottom: 2px solid var(--accent);
+  padding: 14px 10%;
+  text-align: center;
+  font-size: 1.25em;
+  font-style: italic;
+  color: var(--text);
+}
+.note-content-wrap blockquote[data-style='boxed'] {
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius-md);
+  background: var(--panel-raised);
+  padding: 10px 16px;
+}
+.note-content-wrap hr[data-style='dashed'] { border-top-style: dashed; }
+.note-content-wrap hr[data-style='dotted'] { border-top: 3px dotted var(--border); }
+.note-content-wrap hr[data-style='double'] { border-top: 4px double var(--border); }
+.note-content-wrap hr[data-style='thick'] { border-top: 4px solid var(--text-faint); border-radius: 2px; }
+.note-content-wrap hr[data-style='fade'] {
+  border-top: none;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--text-faint), transparent);
+}
+.note-hr-sample {
+  display: inline-block;
+  width: 34px;
+  vertical-align: middle;
+  margin-right: 6px;
+  border-top: 1px solid currentColor;
+}
+.note-hr-sample[data-style='dashed'] { border-top-style: dashed; }
+.note-hr-sample[data-style='dotted'] { border-top: 3px dotted currentColor; }
+.note-hr-sample[data-style='double'] { border-top: 4px double currentColor; }
+.note-hr-sample[data-style='thick'] { border-top-width: 4px; }
+.note-hr-sample[data-style='fade'] { border-top: none; height: 1px; background: linear-gradient(90deg, transparent, currentColor, transparent); }
+
+/* collapsible section */
+.note-content-wrap .note-details {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 6px 10px 6px 4px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+}
+.note-details-toggle {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13px;
+}
+.note-details-toggle:hover {
+  background: var(--panel-raised);
+  color: var(--text);
+}
+.note-details-body {
+  flex: 1;
+  min-width: 0;
+}
+.note-content-wrap summary,
+.note-content-wrap .note-details-summary {
+  display: block;
+  font-weight: 600;
+  padding: 2px 0;
+  list-style: none;
+}
+.note-content-wrap .note-details:not(.is-open) .note-details-content {
+  display: none;
+}
+.note-content-wrap .note-details-content {
+  margin-top: 6px;
+}
+.note-content-wrap .note-details-content > :last-child {
+  margin-bottom: 0;
+}
+
+/* columns */
+.note-content-wrap .note-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 0 0 12px;
+}
+.note-content-wrap .note-columns[data-columns='3'] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.note-content-wrap .note-column {
+  min-width: 0;
+}
+.note-editor:not(.is-readonly) .note-content-wrap .note-column {
+  outline: 1px dashed var(--border);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+.note-content-wrap .note-column > :last-child {
+  margin-bottom: 0;
+}
+
+/* hashtags */
+.note-hashtag {
+  color: var(--accent-text);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-radius: 4px;
+  padding: 0 2px;
+}
+
+/* view options */
+.note-editor.focus-paragraph .note-content-wrap .ProseMirror > * {
+  opacity: 0.28;
+  transition: opacity 0.2s;
+}
+.note-editor.focus-paragraph .note-content-wrap .ProseMirror > .is-current-block {
+  opacity: 1;
+}
+.note-editor.show-marks .note-content-wrap p::after,
+.note-editor.show-marks .note-content-wrap h1::after,
+.note-editor.show-marks .note-content-wrap h2::after,
+.note-editor.show-marks .note-content-wrap h3::after,
+.note-editor.show-marks .note-content-wrap h4::after,
+.note-editor.show-marks .note-content-wrap h5::after,
+.note-editor.show-marks .note-content-wrap h6::after {
+  content: '¶';
+  margin-left: 2px;
+  color: var(--text-faint);
+  font-weight: 400;
+  font-size: 0.85em;
+}
+.note-editor.show-marks .note-content-wrap br::before {
+  content: '↵';
+  color: var(--text-faint);
+}
+.note-editor.line-numbers .note-content-wrap .ProseMirror {
+  counter-reset: note-line;
+  padding-left: 34px;
+}
+.note-editor.line-numbers .note-content-wrap .ProseMirror > * {
+  counter-increment: note-line;
+  position: relative;
+}
+.note-editor.line-numbers .note-content-wrap .ProseMirror > *::before {
+  content: counter(note-line);
+  position: absolute;
+  left: -34px;
+  width: 24px;
+  text-align: right;
+  font: 11px/1.9 var(--font-mono);
+  color: var(--text-faint);
+  float: none;
+}
+.note-content-wrap pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.note-editor.nowrap-code .note-content-wrap pre {
+  white-space: pre;
+  word-break: normal;
+}
+
+/* status bar extras */
+.note-goal {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.note-goal-bar {
+  display: inline-block;
+  width: 60px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+.note-goal-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+.note-status-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* statistics, note picker, snapshots */
+.note-stats td:last-child {
+  text-align: right;
+}
+.note-stats-head {
+  margin: 16px 0 8px;
+}
+.note-stats-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.note-stats-chips span {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--panel-raised);
+  font-size: 12.5px;
+}
+.note-stats-chips small {
+  color: var(--text-faint);
+  margin-left: 2px;
+}
+.note-pick-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 50vh;
+  overflow: auto;
+  margin-top: 10px;
+}
+.note-pick-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.note-pick-item:hover {
+  background: var(--panel-raised);
+}
+.note-snap-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.note-snap-row > span {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  font-size: 13px;
+}
+.note-snap-row small {
+  color: var(--text-muted);
+}
+.note-outline-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.note-outline-close {
+  display: none;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* ==================== Note editor: phones ==================== */
+@media (max-width: 800px) {
+  /* The page style's padding is for the desktop page; on a phone it only squeezes the text. */
+  .note-print-area {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .note-head .page-head-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    width: 100%;
+  }
+  .note-head .page-head-actions .btn {
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+  .note-editor {
+    border-radius: var(--radius-sm);
+  }
+  .note-sticky {
+    top: calc(52px + env(safe-area-inset-top));
+  }
+  /* One swipeable row instead of a toolbar that runs off the screen. */
+  .note-toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 6px;
+    gap: 2px;
+  }
+  .note-toolbar::-webkit-scrollbar {
+    display: none;
+  }
+  .note-toolbar-group {
+    flex: none;
+    padding-right: 4px;
+    margin-right: 4px;
+  }
+  .note-toolbar-group:last-child {
+    padding-right: 24px;
+  }
+  .note-tb-btn {
+    min-width: 36px;
+    height: 36px;
+    font-size: 14px;
+  }
+  .note-tb-select {
+    height: 36px;
+    max-width: 120px;
+    font-size: 13px;
+  }
+  /* Menus open as a sheet above the bottom tab bar, so the scrolling toolbar can't clip them. */
+  .note-dd-panel,
+  .note-dd-panel.wide {
+    position: fixed;
+    left: 8px !important;
+    right: 8px;
+    top: auto;
+    bottom: calc(66px + env(safe-area-inset-bottom));
+    width: auto;
+    min-width: 0;
+    max-height: 58vh;
+    transform: none !important;
+    z-index: 120;
+    border-radius: 12px;
+    padding: 8px;
+  }
+  .note-dd-cols {
+    grid-template-columns: 1fr;
+  }
+  .note-dd-item {
+    min-height: 40px;
+  }
+  .note-link-prompt {
+    flex-wrap: wrap;
+  }
+  .note-link-prompt .input {
+    flex: 1 1 100%;
+  }
+  .note-content-wrap {
+    padding: 16px 14px;
+  }
+  .note-content-wrap h1 { font-size: 23px; }
+  .note-content-wrap h2 { font-size: 19px; }
+  .note-content-wrap .note-columns,
+  .note-content-wrap .note-columns[data-columns='3'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .note-content-wrap blockquote[data-style='pull'] {
+    padding: 12px 4px;
+  }
+  .note-content-wrap .tableWrapper {
+    -webkit-overflow-scrolling: touch;
+  }
+  .note-editor.line-numbers .note-content-wrap .ProseMirror {
+    padding-left: 26px;
+  }
+  .note-statusbar {
+    gap: 10px;
+    padding: 6px 10px;
+  }
+  .note-stat-extra {
+    display: none;
+  }
+  /* The outline becomes a sheet you can open from the 🔍/☷ buttons. */
+  .note-editor.outline-open .note-outline {
+    display: block;
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    top: auto;
+    bottom: calc(66px + env(safe-area-inset-bottom));
+    max-height: 50vh;
+    z-index: 110;
+    background: var(--panel-raised);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.35);
+  }
+  .note-outline-close {
+    display: block;
+  }
+  .note-outline-item {
+    padding: 9px 8px;
+    font-size: 14px;
+  }
+  .note-toast {
+    bottom: calc(72px + env(safe-area-inset-bottom));
+  }
+  .note-slash {
+    width: min(300px, calc(100vw - 24px));
+  }
+}
