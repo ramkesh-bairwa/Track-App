@@ -63,3 +63,43 @@ to register the first account.
 - Auth is a simple email/password + JWT session cookie, scoped to a
   single self-hosted user base (no email verification, no password reset
   — add those if you expose this beyond yourself).
+
+## Deploy (Docker + Jenkins)
+
+Files: `Dockerfile`, `docker-compose.yml`, `Jenkinsfile`, `deploy/remote-deploy.sh`.
+
+The Jenkins job builds the image, smoke-tests it, streams it to the server
+over SSH (`docker save | ssh docker load`, no registry needed) and starts it
+with docker compose. If the new version doesn't pass its health check, the
+previous one is started again and the build fails.
+
+**Server (once)**
+
+1. Install Docker with the compose plugin; create the deploy user and add it
+   to the `docker` group.
+2. MySQL/MariaDB on the server must accept connections from Docker: set
+   `bind-address = 0.0.0.0` (or the docker bridge IP) and allow the DB user
+   from `172.%`. In `.env` use `DB_HOST=host.docker.internal`.
+3. Put Nginx/Caddy with HTTPS in front of `127.0.0.1:3000`.
+
+**Jenkins (once)**
+
+- Plugins: Pipeline, Git, Credentials Binding, SSH Agent. The agent needs Docker.
+- Credentials: `mytrack-deploy-ssh` (SSH key for the server) and
+  `mytrack-env` (secret file: your production `.env`, see `.env.example`).
+- New Pipeline job → "Pipeline script from SCM" → this repo. Fill in
+  `DEPLOY_HOST` / `DEPLOY_USER` / `DEPLOY_DIR` on the first run.
+
+**Database schema**: tick `RUN_MIGRATIONS` to apply `scripts/schema.sql` before
+starting. It's safe to re-run, but uses MariaDB syntax (`ADD COLUMN IF NOT
+EXISTS`) and fails on MySQL.
+
+**Manually** (no Jenkins):
+
+```bash
+docker build -t mytrack:latest .
+docker compose up -d                                    # uses .env next to it
+docker compose run --rm mytrack node scripts/migrate.js # schema, if needed
+```
+
+Downloads and tracker screenshots are kept in the `mytrack-data` volume.

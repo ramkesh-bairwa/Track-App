@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { applyChromeColorLive } from '@/lib/color';
+import { applyChromeColorLive, contentColorStyle } from '@/lib/color';
 
 const SIDEBAR_SELECTOR = '.sidebar';
 const TOPBAR_SELECTOR = '.topbar, .mobile-topbar';
+const CONTENT_SELECTOR = 'html';
 
 const PRESET_COLORS = [
   // Neutral darks
@@ -54,6 +55,8 @@ export default function AppearanceModal({ user, onClose, onSaved }) {
   const originalTopbar = useRef(user?.topbar_color || null);
   const [sidebarColor, setSidebarColor] = useState(originalSidebar.current);
   const [topbarColor, setTopbarColor] = useState(originalTopbar.current);
+  const originalContent = useRef(user?.content_color || null);
+  const [contentColor, setContentColor] = useState(originalContent.current);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const savedRef = useRef(false);
@@ -68,6 +71,10 @@ export default function AppearanceModal({ user, onClose, onSaved }) {
     applyChromeColorLive(TOPBAR_SELECTOR, topbarColor);
   }, [topbarColor]);
 
+  useEffect(() => {
+    applyChromeColorLive(CONTENT_SELECTOR, contentColor, contentColorStyle);
+  }, [contentColor]);
+
   // If the modal is closed without saving, revert the live preview back to
   // whatever was actually saved before this modal opened.
   useEffect(() => {
@@ -75,6 +82,7 @@ export default function AppearanceModal({ user, onClose, onSaved }) {
       if (!savedRef.current) {
         applyChromeColorLive(SIDEBAR_SELECTOR, originalSidebar.current);
         applyChromeColorLive(TOPBAR_SELECTOR, originalTopbar.current);
+        applyChromeColorLive(CONTENT_SELECTOR, originalContent.current, contentColorStyle);
       }
     };
   }, []);
@@ -87,7 +95,7 @@ export default function AppearanceModal({ user, onClose, onSaved }) {
       const res = await fetch('/api/auth/appearance', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sidebar_color: sidebarColor, topbar_color: topbarColor }),
+        body: JSON.stringify({ sidebar_color: sidebarColor, topbar_color: topbarColor, content_color: contentColor }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || 'Could not save appearance settings.');
@@ -117,6 +125,12 @@ export default function AppearanceModal({ user, onClose, onSaved }) {
             value={topbarColor}
             onChange={setTopbarColor}
             hint="Applies to the bar with your profile menu at the top."
+          />
+          <ColorField
+            label="Page background color"
+            value={contentColor}
+            onChange={setContentColor}
+            hint="Applies to the pages, popups and dropdowns; their panels and text adjust to match."
           />
           <div className="modal-actions">
             <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>

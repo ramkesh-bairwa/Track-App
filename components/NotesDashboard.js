@@ -34,7 +34,8 @@ export default function NotesDashboard({ notes }) {
           <p>Freeform notes — text, lists, tables, images — organized into as many levels as you like.</p>
         </div>
         <div className="page-head-actions">
-          <button className="btn btn-primary" onClick={() => setShowNew(true)}>＋ New note</button>
+          <button className="btn" onClick={() => setShowNew('plain')}>{'</>'} New code note</button>
+          <button className="btn btn-primary" onClick={() => setShowNew('rich')}>＋ New note</button>
         </div>
       </div>
 
@@ -52,7 +53,7 @@ export default function NotesDashboard({ notes }) {
         <div className="empty-state">
           <h3>Nothing here yet</h3>
           <p>Create your first note — free-form text, a checklist, a table, anything.</p>
-          <button className="btn btn-primary" onClick={() => setShowNew(true)}>＋ New note</button>
+          <button className="btn btn-primary" onClick={() => setShowNew('rich')}>＋ New note</button>
         </div>
       ) : q && visibleNotes.length === 0 ? (
         <div className="empty-state">
@@ -67,7 +68,7 @@ export default function NotesDashboard({ notes }) {
         </div>
       )}
 
-      {showNew && <NewNoteModal onClose={() => setShowNew(false)} />}
+      {showNew && <NewNoteModal defaultMode={showNew} onClose={() => setShowNew(false)} />}
     </>
   );
 }

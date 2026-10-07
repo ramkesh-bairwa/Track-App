@@ -23,6 +23,15 @@
   --radius-md: 7px;
   --font-ui: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
+  /* The page's own tokens, resolved here at the root, for things inside the
+     sidebar/top bar that float over the page (the profile dropdown) — those
+     bars override --text etc. for a custom color, these stay the page's. */
+  --page-panel-raised: var(--panel-raised);
+  --page-border: var(--border);
+  --page-border-soft: var(--border-soft);
+  --page-text: var(--text);
+  --page-text-muted: var(--text-muted);
+  --page-text-faint: var(--text-faint);
 }
 
 :root[data-theme='light'] {
@@ -65,6 +74,10 @@ html,
 body {
   padding: 0;
   margin: 0;
+}
+/* No double-tap-to-zoom (pinch zoom still works): a double tap is "edit" here. */
+html {
+  touch-action: manipulation;
 }
 
 body {
@@ -702,8 +715,8 @@ textarea.input {
   top: calc(100% + 8px);
   right: 0;
   min-width: 200px;
-  background: var(--panel-raised);
-  border: 1px solid var(--border);
+  background: var(--page-panel-raised);
+  border: 1px solid var(--page-border);
   border-radius: var(--radius-md);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
   padding: 6px;
@@ -711,22 +724,14 @@ textarea.input {
   /* This dropdown floats over the page, detached from the top bar's own
      rectangle, so it must not inherit a custom top-bar color's token
      overrides (meant only for content painted directly on that bar) —
-     pin it back to the current theme's real defaults. */
-  --text: #e9ebef;
-  --text-muted: #8b93a5;
-  --text-faint: #5c6478;
-  --border: #282e3a;
-  --border-soft: #202531;
-  --panel-raised: #1f2430;
+     pin it back to the page's tokens (theme or page background color). */
+  --text: var(--page-text);
+  --text-muted: var(--page-text-muted);
+  --text-faint: var(--page-text-faint);
+  --border: var(--page-border);
+  --border-soft: var(--page-border-soft);
+  --panel-raised: var(--page-panel-raised);
   color: var(--text);
-}
-:root[data-theme='light'] .profile-menu-dropdown {
-  --text: #1a1d24;
-  --text-muted: #5b6472;
-  --text-faint: #8991a0;
-  --border: #dde1e8;
-  --border-soft: #e6e9ef;
-  --panel-raised: #edeff3;
 }
 .profile-menu-header {
   display: flex;
@@ -2054,20 +2059,27 @@ button.cell-link {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 8px;
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
-    height: 52px;
+    height: calc(52px + env(safe-area-inset-top));
     background: var(--panel);
     color: var(--text);
     border-bottom: 1px solid var(--border);
-    padding: 0 16px;
+    padding: env(safe-area-inset-top) max(10px, env(safe-area-inset-right)) 0 max(10px, env(safe-area-inset-left));
     z-index: 100;
   }
   .mobile-topbar-title {
+    flex: 1;
+    min-width: 0;
+    text-align: center;
     font-size: 15px;
     font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .mobile-menu-btn {
     display: flex;
@@ -2120,13 +2132,25 @@ button.cell-link {
     to   { transform: translateX(0); }
   }
 
-  /* Push main content below topbar */
+  /* Push main content between the fixed top bar and bottom tab bar. The
+     shell is exactly one screen tall and .main is the scroller inside it. */
   .app-shell {
-    grid-template-columns: 1fr;
-    padding-top: 52px;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    padding-top: calc(52px + env(safe-area-inset-top));
+    padding-bottom: calc(58px + env(safe-area-inset-bottom));
+  }
+  .content-area {
+    height: auto;
+    flex: 1;
+    min-height: 0;
   }
   .main {
-    padding: 16px 14px 80px;
+    padding: 16px max(14px, env(safe-area-inset-right)) 28px max(14px, env(safe-area-inset-left));
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
   }
   /* Hide desktop topbar profile menu on mobile (it's in the sidebar drawer) */
   .topbar {
@@ -2224,10 +2248,55 @@ button.cell-link {
     padding: 10px 12px;
   }
 
-  /* Track grid: single column */
+  /* Track / note grid: compact tiles, 2 per row on a phone, 3 when there's room */
   .track-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 10px;
+  }
+  .track-grid .track-card {
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    min-width: 0;
+  }
+  .track-grid .track-card-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .track-grid .track-card-icon {
+    width: 34px;
+    height: 34px;
+    font-size: 15px;
+  }
+  .track-grid .track-card h3 {
+    font-size: 14px;
+    line-height: 1.3;
+    max-width: 100%;
+    word-break: break-word;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+  .track-grid .track-card p {
+    flex: 1;
+    min-height: 0;
+    font-size: 12px;
+    line-height: 1.4;
+    -webkit-line-clamp: 2;
+  }
+  .track-grid .track-card-meta {
+    margin-top: 10px;
+    padding-top: 8px;
+    font-size: 11px;
+    flex-wrap: wrap;
+    gap: 2px 8px;
+  }
+  .dashboard-search-input {
+    max-width: none;
+    margin-bottom: 14px;
   }
 
   /* Builder: stack palette below dropzone */
@@ -8473,6 +8542,1121 @@ button.tasks-menu-trigger {
 /* Sr. No. column on task boards */
 .task-th-serial, .task-td-serial, .track-th-serial, .track-td-serial { width: 1%; white-space: nowrap; text-align: right; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .task-td-serial, .track-td-serial { font-size: 12.5px; }
+
+/* =========================================================
+   Mobile app shell
+   Below 800px the app behaves like a native app: a fixed
+   header, a bottom tab bar, sheet-style modals and touch-
+   sized controls. Respects the notch / home indicator.
+========================================================= */
+.mobile-tabbar {
+  display: none;
+}
+
+@media (max-width: 800px) {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  body {
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
+  }
+  img,
+  video,
+  canvas,
+  svg,
+  iframe {
+    max-width: 100%;
+  }
+  pre {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  /* ---- header ---- */
+  .mobile-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    border: none;
+    background: none;
+    color: var(--text);
+    border-radius: var(--radius-sm);
+    font-size: 17px;
+    cursor: pointer;
+  }
+  .mobile-icon-btn:active {
+    background: var(--panel-raised);
+  }
+  .mobile-menu-btn {
+    flex-shrink: 0;
+  }
+  .mobile-topbar-right {
+    width: 40px;
+    display: flex;
+    justify-content: flex-end;
+    flex-shrink: 0;
+  }
+  .mobile-topbar .profile-menu-dropdown {
+    position: fixed;
+    top: calc(56px + env(safe-area-inset-top));
+    right: max(10px, env(safe-area-inset-right));
+    min-width: 220px;
+    max-width: calc(100vw - 20px);
+  }
+  .mobile-topbar .profile-menu-item {
+    padding: 11px 12px;
+    font-size: 14px;
+  }
+
+  /* ---- bottom tab bar ---- */
+  .mobile-tabbar {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: calc(58px + env(safe-area-inset-bottom));
+    padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -8px 24px -18px rgba(0, 0, 0, 0.6);
+    z-index: 100;
+  }
+  .mobile-tab {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    border: none;
+    background: none;
+    color: var(--text-faint);
+    text-decoration: none;
+    font-size: 10.5px;
+    font-weight: 500;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: color 0.12s ease;
+  }
+  .mobile-tab i {
+    font-size: 18px;
+  }
+  .mobile-tab span {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mobile-tab.active {
+    color: var(--accent-text);
+  }
+  .mobile-tab:active i {
+    transform: scale(0.9);
+  }
+
+  /* ---- drawer ---- */
+  .mobile-drawer {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .mobile-drawer .sidebar-link,
+  .mobile-drawer .sidebar-tasks-link {
+    min-height: 40px;
+  }
+  /* The drawer scrolls as a whole. On desktop the track/tool lists share the
+     sidebar's leftover height, but in the drawer the links above already fill
+     the screen, so they'd open at 0px tall ("My records" showed nothing). */
+  .mobile-drawer .sidebar {
+    height: auto;
+    min-height: 100%;
+    overflow: visible;
+  }
+  .mobile-drawer .sidebar-list {
+    flex: none;
+    overflow: visible;
+  }
+  .mobile-drawer-overlay {
+    animation: mobileFadeIn 0.18s ease;
+  }
+  @keyframes mobileFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  /* ---- modals: bottom sheets ---- */
+  .modal-overlay {
+    padding-top: env(safe-area-inset-top);
+    z-index: 150; /* above the header and tab bar */
+  }
+  .modal,
+  .modal.modal-lg {
+    max-width: 100%;
+    max-height: 92vh;
+    max-height: 92dvh;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom));
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    animation: mobileSheetUp 0.22s ease;
+    overscroll-behavior: contain;
+  }
+  .modal::before {
+    content: '';
+    display: block;
+    width: 38px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border);
+    margin: -8px auto 14px;
+  }
+  @keyframes mobileSheetUp {
+    from { transform: translateY(40px); opacity: 0.6; }
+    to   { transform: translateY(0); opacity: 1; }
+  }
+  .modal-actions {
+    flex-wrap: wrap;
+    position: sticky;
+    bottom: 0;
+    padding-bottom: 4px;
+    background: var(--panel);
+    z-index: 2;
+  }
+  .modal-actions .btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+  .task-modal-left {
+    flex-basis: 100%;
+    margin-right: 0;
+  }
+
+  /* ---- forms: no iOS zoom on focus ---- */
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='file']),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  /* ---- generic layout safety ---- */
+  .page-head > div:first-child {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .page-head h1 {
+    word-break: break-word;
+  }
+  .tabs {
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .table-panel,
+  .task-table-wrap {
+    max-width: 100%;
+  }
+  .task-table-wrap {
+    -webkit-overflow-scrolling: touch;
+  }
+  .task-status-strip {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .task-status-strip::-webkit-scrollbar {
+    display: none;
+  }
+  .row-action-btn {
+    min-width: 32px;
+    min-height: 32px;
+  }
+  .export-dropdown {
+    max-width: calc(100vw - 28px);
+  }
+
+  /* ---- notes ---- */
+  .note-sticky {
+    top: 0;
+  }
+  .note-toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .note-toolbar::-webkit-scrollbar {
+    display: none;
+  }
+  .note-toolbar-group {
+    flex-shrink: 0;
+  }
+  .note-tb-btn {
+    min-width: 34px;
+    min-height: 34px;
+  }
+  .note-char-grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+
+  /* ---- column / builder rows ---- */
+  .builder-row {
+    grid-template-columns: 20px minmax(0, 1fr) 110px 24px;
+  }
+
+  /* ---- photo editor / collage ---- */
+  .photo-tabs {
+    display: flex;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .photo-tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .photo-tabs > * {
+    flex: 1 0 auto;
+  }
+  .photo-tool-grid,
+  .collage-tray {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .photo-stickers {
+    grid-template-columns: repeat(6, 1fr);
+  }
+  .collage-layouts,
+  .collage-cell-filters {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  /* ---- sticky side panels become normal flow ---- */
+  .qr-output,
+  .cal-day {
+    position: static;
+    max-height: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .filter-bar {
+    grid-template-columns: 1fr;
+  }
+  .builder-row {
+    grid-template-columns: 20px minmax(0, 1fr) 90px 24px;
+  }
+  .mobile-tab {
+    font-size: 10px;
+  }
+}
+
+/* Touch screens have no hover: show the controls that desktop reveals on hover. */
+@media (hover: none) {
+  .task-th-tools {
+    display: inline-flex;
+  }
+}
+
+/* ---------------- Notes: plain text / code mode ---------------- */
+.note-mode-tabs {
+  display: inline-flex;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 3px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.note-plain {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  overflow: hidden;
+}
+.note-plain-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--panel-raised);
+  border-bottom: 1px solid var(--border);
+}
+.note-plain-badge {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.note-plain-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.note-plain-actions .btn.active {
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+.note-plain-body {
+  display: flex;
+  height: 65vh;
+  min-height: 280px;
+  background: var(--bg);
+}
+.note-plain-gutter {
+  flex-shrink: 0;
+  min-width: 44px;
+  padding: 12px 8px 12px 0;
+  overflow: hidden;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-faint);
+  border-right: 1px solid var(--border-soft);
+  background: var(--panel);
+  user-select: none;
+}
+.note-plain-input {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 12px 14px;
+  border: none;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  tab-size: 4;
+  white-space: pre;
+  overflow: auto;
+}
+.note-plain-body.wrap .note-plain-input {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.note-plain-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 6px 10px;
+  font-size: 11.5px;
+  color: var(--text-faint);
+  border-top: 1px solid var(--border);
+}
+.note-plain-flash {
+  color: var(--accent-text);
+}
+.note-plain-hint {
+  margin-left: auto;
+}
+@media (max-width: 800px) {
+  .note-plain-body {
+    height: 60vh;
+    height: 60dvh;
+  }
+  .note-plain-input,
+  .note-plain-gutter {
+    font-size: 16px; /* no iOS zoom on focus; keeps gutter lines aligned */
+  }
+  .note-plain-gutter {
+    min-width: 36px;
+  }
+  .note-plain-hint {
+    display: none;
+  }
+  .note-mode-tabs {
+    display: flex;
+    width: 100%;
+  }
+  .note-mode-tabs .tab-btn {
+    flex: 1;
+    white-space: nowrap;
+  }
+  /* Give the code editor the full phone width (page padding is for rich notes). */
+  .note-print-area:has(> .note-plain) {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+}
+
+/* New note: editor choice */
+.note-editor-choice {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.note-editor-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 12px;
+  text-align: left;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.note-editor-option:hover {
+  border-color: var(--text-faint);
+}
+.note-editor-option.active {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+.note-editor-option-icon {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent-text);
+}
+.note-editor-option strong {
+  font-size: 13px;
+}
+.note-editor-option small {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+/* ==================== Note editor: extra features ==================== */
+/* text effects */
+.note-content-wrap .note-kbd,
+.note-kbd {
+  display: inline-block;
+  padding: 0 6px;
+  margin: 0 1px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--panel-raised);
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  line-height: 1.5;
+}
+.note-spoiler {
+  filter: blur(5px);
+  background: var(--panel-raised);
+  border-radius: 3px;
+  transition: filter 0.15s;
+}
+.note-spoiler:hover,
+.ProseMirror-focused .note-spoiler:focus-within {
+  filter: none;
+}
+.note-tag {
+  display: inline-block;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 0.82em;
+  font-weight: 600;
+  line-height: 1.6;
+  border: 1px solid transparent;
+  --tag: #8b93a5;
+  background: color-mix(in srgb, var(--tag) 18%, transparent);
+  color: color-mix(in srgb, var(--tag) 75%, var(--text));
+}
+button.note-tag {
+  cursor: pointer;
+  font-family: inherit;
+}
+.note-tag[data-tag='green'] { --tag: #2fb380; }
+.note-tag[data-tag='blue'] { --tag: #4f86f0; }
+.note-tag[data-tag='yellow'] { --tag: #d9a21b; }
+.note-tag[data-tag='red'] { --tag: #e5646b; }
+.note-tag[data-tag='purple'] { --tag: #a26cf0; }
+.note-tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 8px 8px;
+}
+
+/* block styles */
+.note-content-wrap .note-dropcap::first-letter {
+  float: left;
+  font-size: 3.2em;
+  line-height: 0.85;
+  font-weight: 700;
+  margin: 0.06em 0.12em 0 0;
+  color: var(--accent-text);
+}
+.note-content-wrap .note-accentbar {
+  border-left: 4px solid var(--accent);
+  padding-left: 12px;
+}
+.note-content-wrap .note-boxed {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+}
+.note-content-wrap [data-shade] {
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  color: #1a1d24;
+}
+.note-content-wrap blockquote[data-style='pull'] {
+  border-left: none;
+  border-top: 2px solid var(--accent);
+  border-bottom: 2px solid var(--accent);
+  padding: 14px 10%;
+  text-align: center;
+  font-size: 1.25em;
+  font-style: italic;
+  color: var(--text);
+}
+.note-content-wrap blockquote[data-style='boxed'] {
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius-md);
+  background: var(--panel-raised);
+  padding: 10px 16px;
+}
+.note-content-wrap hr[data-style='dashed'] { border-top-style: dashed; }
+.note-content-wrap hr[data-style='dotted'] { border-top: 3px dotted var(--border); }
+.note-content-wrap hr[data-style='double'] { border-top: 4px double var(--border); }
+.note-content-wrap hr[data-style='thick'] { border-top: 4px solid var(--text-faint); border-radius: 2px; }
+.note-content-wrap hr[data-style='fade'] {
+  border-top: none;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--text-faint), transparent);
+}
+.note-hr-sample {
+  display: inline-block;
+  width: 34px;
+  vertical-align: middle;
+  margin-right: 6px;
+  border-top: 1px solid currentColor;
+}
+.note-hr-sample[data-style='dashed'] { border-top-style: dashed; }
+.note-hr-sample[data-style='dotted'] { border-top: 3px dotted currentColor; }
+.note-hr-sample[data-style='double'] { border-top: 4px double currentColor; }
+.note-hr-sample[data-style='thick'] { border-top-width: 4px; }
+.note-hr-sample[data-style='fade'] { border-top: none; height: 1px; background: linear-gradient(90deg, transparent, currentColor, transparent); }
+
+/* collapsible section */
+.note-content-wrap .note-details {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 6px 10px 6px 4px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+}
+.note-details-toggle {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13px;
+}
+.note-details-toggle:hover {
+  background: var(--panel-raised);
+  color: var(--text);
+}
+.note-details-body {
+  flex: 1;
+  min-width: 0;
+}
+.note-content-wrap summary,
+.note-content-wrap .note-details-summary {
+  display: block;
+  font-weight: 600;
+  padding: 2px 0;
+  list-style: none;
+}
+.note-content-wrap .note-details:not(.is-open) .note-details-content {
+  display: none;
+}
+.note-content-wrap .note-details-content {
+  margin-top: 6px;
+}
+.note-content-wrap .note-details-content > :last-child {
+  margin-bottom: 0;
+}
+
+/* columns */
+.note-content-wrap .note-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 0 0 12px;
+}
+.note-content-wrap .note-columns[data-columns='3'] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.note-content-wrap .note-column {
+  min-width: 0;
+}
+.note-editor:not(.is-readonly) .note-content-wrap .note-column {
+  outline: 1px dashed var(--border);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+.note-content-wrap .note-column > :last-child {
+  margin-bottom: 0;
+}
+
+/* hashtags */
+.note-hashtag {
+  color: var(--accent-text);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-radius: 4px;
+  padding: 0 2px;
+}
+
+/* view options */
+.note-editor.focus-paragraph .note-content-wrap .ProseMirror > * {
+  opacity: 0.28;
+  transition: opacity 0.2s;
+}
+.note-editor.focus-paragraph .note-content-wrap .ProseMirror > .is-current-block {
+  opacity: 1;
+}
+.note-editor.show-marks .note-content-wrap p::after,
+.note-editor.show-marks .note-content-wrap h1::after,
+.note-editor.show-marks .note-content-wrap h2::after,
+.note-editor.show-marks .note-content-wrap h3::after,
+.note-editor.show-marks .note-content-wrap h4::after,
+.note-editor.show-marks .note-content-wrap h5::after,
+.note-editor.show-marks .note-content-wrap h6::after {
+  content: '¶';
+  margin-left: 2px;
+  color: var(--text-faint);
+  font-weight: 400;
+  font-size: 0.85em;
+}
+.note-editor.show-marks .note-content-wrap br::before {
+  content: '↵';
+  color: var(--text-faint);
+}
+.note-editor.line-numbers .note-content-wrap .ProseMirror {
+  counter-reset: note-line;
+  padding-left: 34px;
+}
+.note-editor.line-numbers .note-content-wrap .ProseMirror > * {
+  counter-increment: note-line;
+  position: relative;
+}
+.note-editor.line-numbers .note-content-wrap .ProseMirror > *::before {
+  content: counter(note-line);
+  position: absolute;
+  left: -34px;
+  width: 24px;
+  text-align: right;
+  font: 11px/1.9 var(--font-mono);
+  color: var(--text-faint);
+  float: none;
+}
+.note-content-wrap pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.note-editor.nowrap-code .note-content-wrap pre {
+  white-space: pre;
+  word-break: normal;
+}
+
+/* status bar extras */
+.note-goal {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.note-goal-bar {
+  display: inline-block;
+  width: 60px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+.note-goal-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+.note-status-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* statistics, note picker, snapshots */
+.note-stats td:last-child {
+  text-align: right;
+}
+.note-stats-head {
+  margin: 16px 0 8px;
+}
+.note-stats-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.note-stats-chips span {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--panel-raised);
+  font-size: 12.5px;
+}
+.note-stats-chips small {
+  color: var(--text-faint);
+  margin-left: 2px;
+}
+.note-pick-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 50vh;
+  overflow: auto;
+  margin-top: 10px;
+}
+.note-pick-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.note-pick-item:hover {
+  background: var(--panel-raised);
+}
+.note-snap-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.note-snap-row > span {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  font-size: 13px;
+}
+.note-snap-row small {
+  color: var(--text-muted);
+}
+.note-outline-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.note-outline-close {
+  display: none;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* ==================== Note editor: phones ==================== */
+@media (max-width: 800px) {
+  /* The page style's padding is for the desktop page; on a phone it only squeezes the text. */
+  .note-print-area {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .note-head .page-head-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    width: 100%;
+  }
+  .note-head .page-head-actions .btn {
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+  .note-editor {
+    border-radius: var(--radius-sm);
+  }
+  .note-sticky {
+    top: calc(52px + env(safe-area-inset-top));
+  }
+  /* One swipeable row instead of a toolbar that runs off the screen. */
+  .note-toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 6px;
+    gap: 2px;
+  }
+  .note-toolbar::-webkit-scrollbar {
+    display: none;
+  }
+  .note-toolbar-group {
+    flex: none;
+    padding-right: 4px;
+    margin-right: 4px;
+  }
+  .note-toolbar-group:last-child {
+    padding-right: 24px;
+  }
+  .note-tb-btn {
+    min-width: 36px;
+    height: 36px;
+    font-size: 14px;
+  }
+  .note-tb-select {
+    height: 36px;
+    max-width: 120px;
+    font-size: 13px;
+  }
+  /* Menus open as a sheet above the bottom tab bar, so the scrolling toolbar can't clip them. */
+  .note-dd-panel,
+  .note-dd-panel.wide {
+    position: fixed;
+    left: 8px !important;
+    right: 8px;
+    top: auto;
+    bottom: calc(66px + env(safe-area-inset-bottom));
+    width: auto;
+    min-width: 0;
+    max-height: 58vh;
+    transform: none !important;
+    z-index: 120;
+    border-radius: 12px;
+    padding: 8px;
+  }
+  .note-dd-cols {
+    grid-template-columns: 1fr;
+  }
+  .note-dd-item {
+    min-height: 40px;
+  }
+  .note-link-prompt {
+    flex-wrap: wrap;
+  }
+  .note-link-prompt .input {
+    flex: 1 1 100%;
+  }
+  .note-content-wrap {
+    padding: 16px 14px;
+  }
+  .note-content-wrap h1 { font-size: 23px; }
+  .note-content-wrap h2 { font-size: 19px; }
+  .note-content-wrap .note-columns,
+  .note-content-wrap .note-columns[data-columns='3'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .note-content-wrap blockquote[data-style='pull'] {
+    padding: 12px 4px;
+  }
+  .note-content-wrap .tableWrapper {
+    -webkit-overflow-scrolling: touch;
+  }
+  .note-editor.line-numbers .note-content-wrap .ProseMirror {
+    padding-left: 26px;
+  }
+  .note-statusbar {
+    gap: 10px;
+    padding: 6px 10px;
+  }
+  .note-stat-extra {
+    display: none;
+  }
+  /* The outline becomes a sheet you can open from the 🔍/☷ buttons. */
+  .note-editor.outline-open .note-outline {
+    display: block;
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    top: auto;
+    bottom: calc(66px + env(safe-area-inset-bottom));
+    max-height: 50vh;
+    z-index: 110;
+    background: var(--panel-raised);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.35);
+  }
+  .note-outline-close {
+    display: block;
+  }
+  .note-outline-item {
+    padding: 9px 8px;
+    font-size: 14px;
+  }
+  .note-toast {
+    bottom: calc(72px + env(safe-area-inset-bottom));
+  }
+  .note-slash {
+    width: min(300px, calc(100vw - 24px));
+  }
+}
+
+/* Top loading line (components/TopLoader.js) */
+.top-loader {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 10000;
+  pointer-events: none;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent), 0 0 4px var(--accent);
+  transform: scaleX(0);
+  transform-origin: left center;
+  opacity: 0;
+  transition: transform 200ms ease, opacity 300ms ease;
+}
+.top-loader.is-active {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .top-loader {
+    transition: opacity 300ms ease;
+  }
+}
+
+/* Note view mode (components/NoteView.js): the saved note reads like a page —
+   no editor frame, toolbar or status bar until "Edit" is pressed. */
+.note-view-mode .note-editor {
+  border-color: transparent;
+  background: transparent;
+}
+.note-view-mode .note-statusbar {
+  display: none;
+}
+.note-view-mode .note-content-wrap .ProseMirror {
+  outline: none;
+  caret-color: transparent;
+}
+.note-plain-view {
+  margin: 0;
+  padding: 12px 14px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  tab-size: 4;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: inherit;
+  background: var(--bg);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+}
+
+/* Edit / Delete on each note card (components/NoteCard.js) */
+.note-card-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+.note-card-actions .btn {
+  flex: 1;
+  justify-content: center;
+}
+
+/* Export / import data (components/DataTransferModal.js) */
+.data-transfer-modal {
+  max-width: 520px;
+}
+.data-module-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.data-module {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-soft);
+}
+.data-module:last-child {
+  border-bottom: none;
+}
+.data-module:hover {
+  background: var(--panel-raised);
+}
+.data-module.is-empty .data-module-label,
+.data-module.is-empty .data-module-count {
+  color: var(--text-faint);
+}
+.data-module-label {
+  flex: 1;
+}
+.data-module-count {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.data-file-pick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+.data-file-pick input[type='file'] {
+  display: none;
+}
+.data-file-name {
+  font-size: 13px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.data-results {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 14px;
+}
+.data-update-toggle {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 12px;
+  cursor: pointer;
+}
+.data-update-toggle input {
+  margin-top: 3px;
+}
+.data-update-toggle small {
+  display: block;
+  margin-top: 2px;
+}
 
 /* ---------------- Task table: layout fixes ----------------
    1. The pinned actions column must be fully opaque. The zebra / hover rules

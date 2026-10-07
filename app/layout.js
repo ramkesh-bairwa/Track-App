@@ -1,15 +1,31 @@
 import './globals.css';
+import TouchDoubleTap from '@/components/TouchDoubleTap';
+import TopLoader from '@/components/TopLoader';
 
 export const metadata = {
   title: 'MyTrack',
   description: 'Keep a record of everything you build and do.',
 };
 
+// Next renders this as the page's only viewport tag; viewport-fit=cover lets
+// the mobile header and tab bar reach under the notch / home indicator.
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: '#181c24',
+};
+
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="MyTrack" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <link rel="icon" href="/icon.svg" type="image/svg+xml" />
         <script
           dangerouslySetInnerHTML={{
             __html:
@@ -28,7 +44,11 @@ export default function RootLayout({ children }) {
           href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <TopLoader />
+        {children}
+        <TouchDoubleTap />
+      </body>
     </html>
   );
 }

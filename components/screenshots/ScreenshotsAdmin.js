@@ -26,7 +26,7 @@ const whenText = (iso) => {
 function TrackerStatus({ status }) {
   if (!status) return null;
   const bad = status.state === 'no-permission' || status.state === 'error';
-  const label = { ok: 'Last capture', skipped: 'Last run skipped', 'no-permission': 'Not capturing', error: 'Capture failed' }[status.state] || 'Last run';
+  const label = { ok: 'Last capture', skipped: 'Last run skipped', paused: 'Last run skipped', 'no-permission': 'Not capturing', error: 'Capture failed' }[status.state] || 'Last run';
   return (
     <div className={`shots-status${bad ? ' bad' : ''}`}>
       <i className={`fa-solid ${bad ? 'fa-triangle-exclamation' : 'fa-circle-check'}`} />
@@ -64,6 +64,8 @@ export default function ScreenshotsAdmin() {
   const [userId, setUserId] = useState(null);
   const [days, setDays] = useState(null);
   const [status, setStatus] = useState(null);
+  const [paused, setPaused] = useState(null);
+  const [toggling, setToggling] = useState(false);
   const [date, setDate] = useState(null);
   const [files, setFiles] = useState(null);
   const [meta, setMeta] = useState({});
@@ -86,9 +88,10 @@ export default function ScreenshotsAdmin() {
   const loadDays = useCallback(async () => {
     if (userId == null) return;
     try {
-      const { days: counts, status: last } = await api(`/api/admin/screenshots/${userId}`);
+      const { days: counts, status: last, paused: off } = await api(`/api/admin/screenshots/${userId}`);
       setDays(counts);
       setStatus(last);
+      setPaused(off);
       setDate((d) => (d && counts[d] ? d : Object.keys(counts).sort().pop() || null));
     } catch (err) {
       setError(err.message);
@@ -97,6 +100,7 @@ export default function ScreenshotsAdmin() {
   useEffect(() => {
     setDays(null);
     setStatus(null);
+    setPaused(null);
     setDate(null);
     loadDays();
   }, [loadDays]);
@@ -164,6 +168,19 @@ export default function ScreenshotsAdmin() {
       },
     });
   }
+  async function togglePaused() {
+    setToggling(true);
+    setError('');
+    try {
+      const json = await api(`/api/admin/screenshots/${userId}`, 'PATCH', { paused: !paused });
+      setPaused(json.paused);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setToggling(false);
+    }
+  }
+
   function askDeleteAll() {
     setConfirm({
       title: `Delete all of ${user.name}’s screenshots?`,
@@ -223,6 +240,26 @@ export default function ScreenshotsAdmin() {
         </aside>
 
         <section className="shots-panel shots-main">
+          {user && paused !== null && (
+            <div className="shots-capture">
+              <span className="shots-capture-text">
+                <strong>Screenshots for {user.name}</strong>
+                <span>{paused ? 'Off — the tracker skips every capture until you turn them back on.' : 'On — a capture every 5 minutes.'}</span>
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={!paused}
+                aria-label={`Screenshots for ${user.name}`}
+                className={`shots-switch${paused ? '' : ' on'}`}
+                onClick={togglePaused}
+                disabled={toggling}
+              >
+                <span className="shots-switch-knob" />
+              </button>
+              <span className="shots-switch-label">{paused ? 'Off' : 'On'}</span>
+            </div>
+          )}
           <TrackerStatus status={status} />
           {date && files && files.length > 0 ? (
             <>

@@ -356,6 +356,33 @@ export default function Sidebar({ user, tracks }) {
           <span>Task assigner</span>
         </Link>
       )}
+      {menuShown(user, 'expenses') && (
+        <Link
+          href="/dashboard/expenses"
+          className={`sidebar-tasks-link${pathname.startsWith('/dashboard/expenses') ? ' active' : ''}`}
+        >
+          <i className="fa-solid fa-wallet" />
+          <span>Daily expenses</span>
+        </Link>
+      )}
+      {menuShown(user, 'routine') && (
+        <Link
+          href="/dashboard/routine"
+          className={`sidebar-tasks-link${pathname.startsWith('/dashboard/routine') ? ' active' : ''}`}
+        >
+          <i className="fa-solid fa-sun" />
+          <span>Daily routine</span>
+        </Link>
+      )}
+      {menuShown(user, 'notes') && (
+        <Link
+          href="/dashboard/notes"
+          className={`sidebar-tasks-link${pathname.startsWith('/dashboard/notes') ? ' active' : ''}`}
+        >
+          <i className="fa-solid fa-note-sticky" />
+          <span>Notes</span>
+        </Link>
+      )}
       {menuShown(user, 'calendar') && (
         <Link
           href="/dashboard/calendar"

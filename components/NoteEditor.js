@@ -21,6 +21,13 @@ import {
   Dropdown, MenuItem, MenuLabel, MenuSep, ColorGrid, TEXT_COLORS, HIGHLIGHT_COLORS, TableGridPicker,
   EmojiPicker, SymbolPicker, SlashMenu, FindBar, SHORTCUTS,
 } from '@/components/notes/NoteEditorParts';
+import {
+  TextEffects, Kbd, Spoiler, TagLabel, TAG_COLORS, BlockStyles, Details, DetailsSummary, DetailsContent, Columns, Column,
+  BlockTools, LineTools, ChecklistTools, MoreCases, EmojiShortcodes, Hashtags, CurrentBlock, taskCounts, sortTableByColumn, textToTable,
+} from '@/lib/noteExtensionsExtra';
+import {
+  TEMPLATES, LOREM, calculate, StatsModal, NoteLinkPicker, SnapshotsModal, saveSnapshot, canSpeak, canDictate, startDictation,
+} from '@/components/notes/NoteExtras';
 import { safeLink } from '@/lib/safeUrl';
 import { DATE_LOCALE } from '@/lib/dateLocale';
 
@@ -51,6 +58,12 @@ const SPACING = [['None', '0px'], ['Small', '6px'], ['Medium', '12px'], ['Large'
 const CODE_LANGS = ['plain', 'javascript', 'typescript', 'python', 'java', 'php', 'sql', 'html', 'css', 'json', 'bash', 'go', 'ruby', 'c', 'cpp', 'csharp', 'yaml', 'markdown'];
 const ZOOMS = [50, 67, 75, 90, 100, 110, 125, 150, 175, 200];
 const PAGE_WIDTHS = [['Narrow', '680px'], ['Normal', '860px'], ['Wide', '1100px'], ['Full width', 'none']];
+
+const FONT_WEIGHTS = [['Thin', '300'], ['Regular', '400'], ['Medium', '500'], ['Semibold', '600'], ['Bold', '700'], ['Black', '900']];
+const LETTER_SPACINGS = [['Tight', '-0.03em'], ['Normal', null], ['Wide', '0.06em'], ['Wider', '0.14em']];
+const DECORATIONS = [['Dotted underline', 'underline dotted'], ['Dashed underline', 'underline dashed'], ['Wavy underline', 'underline wavy'], ['Double underline', 'underline double'], ['Overline', 'overline']];
+const QUOTE_STYLES = [['Classic', null], ['Pull quote', 'pull'], ['Boxed', 'boxed']];
+const LINE_STYLES = [['Solid', null], ['Dashed', 'dashed'], ['Dotted', 'dotted'], ['Double', 'double'], ['Thick', 'thick'], ['Fade', 'fade']];
 
 const BLOCK_STYLES = [
   { id: 'p', label: 'Normal text' },
@@ -117,11 +130,16 @@ const SLASH_ITEMS = [
   { label: 'Divider', icon: '―', keywords: ['hr', 'line', 'rule'], run: (e) => e.chain().focus().setHorizontalRule().run() },
   { label: 'Page break', icon: '⤓', keywords: ['page', 'break'], run: (e) => e.chain().focus().setPageBreak().run() },
   { label: 'Table of contents', icon: '☰', keywords: ['toc', 'contents'], run: (e) => e.chain().focus().insertTableOfContents().run() },
+  { label: 'Collapsible section', icon: '▸', keywords: ['toggle', 'details', 'fold', 'accordion'], run: (e) => e.chain().focus().setDetails().run() },
+  { label: 'Two columns', icon: '◫', keywords: ['columns', 'layout', 'side'], run: (e) => e.chain().focus().insertColumns(2).run() },
+  { label: 'Three columns', icon: '▥', keywords: ['columns', 'layout'], run: (e) => e.chain().focus().insertColumns(3).run() },
+  ...TEMPLATES.map((t) => ({ label: `${t.label} template`, icon: t.icon, keywords: ['template', t.id], run: (e) => e.chain().focus().insertContent(t.html()).run() })),
+  { label: 'Lorem ipsum', icon: '¶', keywords: ['dummy', 'placeholder', 'lorem'], run: (e) => e.chain().focus().insertContent(`<p>${LOREM}</p>`).run() },
   { label: 'Date', icon: '📅', keywords: ['today'], run: (e) => e.chain().focus().insertContent(nowStamp('date')).run() },
   { label: 'Time', icon: '⏰', keywords: ['now'], run: (e) => e.chain().focus().insertContent(nowStamp('time')).run() },
 ];
 
-export default function NoteEditor({ content, editable = true, onUpdate, onEditorReady, onSaveNow, fileName = 'note' }) {
+export default function NoteEditor({ content, editable = true, onUpdate, onEditorReady, onSaveNow, fileName = 'note', noteId }) {
   const safeName = String(fileName).replace(/[/\\?%*:|"<>]/g, '-').slice(0, 80) || 'note';
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkValue, setLinkValue] = useState('');
@@ -138,6 +156,29 @@ export default function NoteEditor({ content, editable = true, onUpdate, onEdito
   const [locked, setLocked] = useState(false);
   const [painter, setPainter] = useState(null); // copied marks for the format painter
   const [toast, setToast] = useState('');
+  // Extra tools and view options
+  const [modal, setModal] = useState(null); // 'stats' | 'link' | 'snapshots'
+  const [typewriter, setTypewriter] = useState(false);
+  const [focusPara, setFocusPara] = useState(false);
+  const [showMarks, setShowMarks] = useState(false);
+  const [lineNumbers, setLineNumbers] = useState(false);
+  const [wrapCode, setWrapCode] = useState(true);
+  const [speaking, setSpeaking] = useState(false);
+  const [dictating, setDictating] = useState(false);
+  const stopDictationRef = useRef(null);
+  const [goal, setGoalState] = useState(0);
+  useEffect(() => {
+    try {
+      setGoalState(Number(localStorage.getItem(`mytrack_note_goal_${noteId}`)) || 0);
+    } catch {}
+  }, [noteId]);
+  const setGoal = (n) => {
+    setGoalState(n);
+    try {
+      if (n) localStorage.setItem(`mytrack_note_goal_${noteId}`, String(n));
+      else localStorage.removeItem(`mytrack_note_goal_${noteId}`);
+    } catch {}
+  };
   const imageInputRef = useRef(null);
   const importInputRef = useRef(null);
 
@@ -182,6 +223,23 @@ export default function NoteEditor({ content, editable = true, onUpdate, onEdito
       FindReplace,
       SlashMenuExt,
       ImageDrop,
+      TextEffects,
+      Kbd,
+      Spoiler,
+      TagLabel,
+      BlockStyles,
+      Details,
+      DetailsSummary,
+      DetailsContent,
+      Columns,
+      Column,
+      BlockTools,
+      LineTools,
+      ChecklistTools,
+      MoreCases,
+      EmojiShortcodes,
+      Hashtags,
+      CurrentBlock,
     ],
     []
   );
@@ -212,8 +270,13 @@ export default function NoteEditor({ content, editable = true, onUpdate, onEdito
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [content, editor]);
 
+  const wasEditableRef = useRef(editable);
   useEffect(() => {
-    if (editor) editor.setEditable(editable && !locked);
+    if (!editor) return;
+    editor.setEditable(editable && !locked, false); // false: toggling edit mode is not a content change
+    // Switching a read-only note to edit mode puts the cursor in it right away.
+    if (editable && !wasEditableRef.current && !locked) editor.commands.focus('end');
+    wasEditableRef.current = editable;
   }, [editor, editable, locked]);
 
   // Format painter: after copying, the next selection gets those marks.
@@ -232,6 +295,24 @@ export default function NoteEditor({ content, editable = true, onUpdate, onEdito
     dom.addEventListener('mouseup', onUp);
     return () => dom.removeEventListener('mouseup', onUp);
   }, [editor, painter, flash]);
+
+  // Typewriter scrolling: keep the line you're typing on in the middle of the screen.
+  useEffect(() => {
+    if (!editor || !typewriter) return undefined;
+    const center = () => {
+      const { node } = editor.view.domAtPos(editor.state.selection.head);
+      const el = node.nodeType === 3 ? node.parentElement : node;
+      el?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+    };
+    editor.on('selectionUpdate', center);
+    return () => editor.off('selectionUpdate', center);
+  }, [editor, typewriter]);
+
+  // Stop talking / listening when leaving the note.
+  useEffect(() => () => {
+    if (canSpeak()) window.speechSynthesis.cancel();
+    stopDictationRef.current?.();
+  }, []);
 
   const openLink = useCallback(() => {
     if (!editor) return;
@@ -252,8 +333,8 @@ export default function NoteEditor({ content, editable = true, onUpdate, onEdito
       const k = e.key.toLowerCase();
       if (k === 'f' && !e.shiftKey) { e.preventDefault(); setFind({ replace: false }); }
       else if (k === 'h' && !e.shiftKey) { e.preventDefault(); setFind({ replace: true }); }
-      else if (k === 's') { e.preventDefault(); onSaveNow?.(); flash('Saved'); }
-      else if (k === 'k') { e.preventDefault(); openLink(); }
+      else if (k === 's' && !e.shiftKey) { e.preventDefault(); onSaveNow?.(); flash('Saved'); }
+      else if (k === 'k' && !e.shiftKey) { e.preventDefault(); openLink(); }
       else if (e.key === ']') { e.preventDefault(); editor.chain().focus().sinkListItem('listItem').run() || editor.chain().focus().sinkListItem('taskItem').run() || editor.commands.indentBlock(); }
       else if (e.key === '[') { e.preventDefault(); editor.chain().focus().liftListItem('listItem').run() || editor.chain().focus().liftListItem('taskItem').run() || editor.commands.outdentBlock(); }
       else if (k === '/' ) { e.preventDefault(); setShowShortcuts(true); }
@@ -331,6 +412,81 @@ export default function NoteEditor({ content, editable = true, onUpdate, onEdito
     }
   }
 
+  function readAloud() {
+    if (!canSpeak()) return flash('Read aloud is not supported in this browser');
+    if (speaking) {
+      window.speechSynthesis.cancel();
+      setSpeaking(false);
+      return undefined;
+    }
+    const text = empty ? jsonToText(editor.getJSON()) : editor.state.doc.textBetween(from, to, '\n');
+    if (!text.trim()) return flash('Nothing to read');
+    const u = new SpeechSynthesisUtterance(text);
+    u.onend = () => setSpeaking(false);
+    u.onerror = () => setSpeaking(false);
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(u);
+    setSpeaking(true);
+    return undefined;
+  }
+
+  function toggleDictation() {
+    if (dictating) {
+      stopDictationRef.current?.();
+      return;
+    }
+    if (!canDictate()) {
+      flash('Voice typing needs Chrome, Edge or Safari');
+      return;
+    }
+    try {
+      stopDictationRef.current = startDictation(
+        (text) => editor.chain().focus().insertContent(`${text.trim()} `).run(),
+        () => setDictating(false)
+      );
+      setDictating(true);
+      flash('Listening… speak now');
+    } catch {
+      flash('Could not start the microphone');
+    }
+  }
+
+  function calcSelection() {
+    const expr = editor.state.doc.textBetween(from, to, ' ');
+    const result = calculate(expr);
+    if (result === null) return flash('Select a sum like 1250 * 12 + 300');
+    editor.chain().focus().setTextSelection(to).insertContent(` = ${result.toLocaleString('en-IN', { maximumFractionDigits: 10 })}`).run();
+    return undefined;
+  }
+
+  async function insertQr() {
+    const selected = editor.state.doc.textBetween(from, to, ' ').trim();
+    const value = window.prompt('Text or link for the QR code', selected || editor.getAttributes('link').href || '');
+    if (!value?.trim()) return;
+    try {
+      const QRCode = (await import('qrcode')).default;
+      const src = await QRCode.toDataURL(value.trim(), { margin: 1, width: 240 });
+      editor.chain().focus().setImage({ src, alt: `QR code: ${value.trim()}` }).run();
+    } catch {
+      flash('Could not make a QR code from that');
+    }
+  }
+
+  function exportWord() {
+    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>${safeName}</title></head><body>${editor.getHTML()}</body></html>`;
+    download(`﻿${html}`, `${safeName}.doc`, 'application/msword');
+  }
+
+  function askGoal() {
+    const n = window.prompt('Word goal for this note (0 to remove)', goal ? String(goal) : '500');
+    if (n === null) return;
+    const v = Math.max(0, Math.floor(Number(n) || 0));
+    setGoal(v);
+    flash(v ? `Goal set: ${v} words` : 'Word goal removed');
+  }
+
+  const tasks = taskCounts(editor.state.doc);
+
   const tb = (active, onClick, label, title, disabled) => (
     <button
       type="button"
@@ -346,7 +502,7 @@ export default function NoteEditor({ content, editable = true, onUpdate, onEdito
   const run = (fn) => () => fn(editor.chain().focus()).run();
 
   return (
-    <div className={`note-editor${fullscreen ? ' note-editor-fullscreen' : ''}${readOnly ? ' is-readonly' : ''}`}>
+    <div className={`note-editor${fullscreen ? ' note-editor-fullscreen' : ''}${readOnly ? ' is-readonly' : ''}${focusPara ? ' focus-paragraph' : ''}${showMarks ? ' show-marks' : ''}${lineNumbers ? ' line-numbers' : ''}${wrapCode ? '' : ' nowrap-code'}${outline ? ' outline-open' : ''}`}>
       <div className="note-sticky">
       {editable && (
         <div className="note-toolbar" role="toolbar" aria-label="Formatting">
@@ -402,7 +558,56 @@ export default function NoteEditor({ content, editable = true, onUpdate, onEdito
                   <MenuItem close={close} disabled={empty} onClick={() => editor.chain().focus().toLowerCase().run()}>lowercase</MenuItem>
                   <MenuItem close={close} disabled={empty} onClick={() => editor.chain().focus().toTitleCase().run()}>Title Case</MenuItem>
                   <MenuItem close={close} disabled={empty} onClick={() => editor.chain().focus().toSentenceCase().run()}>Sentence case</MenuItem>
+                  <MenuItem close={close} disabled={empty} onClick={() => editor.chain().focus().toToggleCase().run()}>tOGGLE cASE</MenuItem>
+                  <MenuSep />
+                  <MenuLabel>For code</MenuLabel>
+                  <MenuItem close={close} disabled={empty} onClick={() => editor.chain().focus().toCamelCase().run()}>camelCase</MenuItem>
+                  <MenuItem close={close} disabled={empty} onClick={() => editor.chain().focus().toSnakeCase().run()}>snake_case</MenuItem>
+                  <MenuItem close={close} disabled={empty} onClick={() => editor.chain().focus().toKebabCase().run()}>kebab-case</MenuItem>
+                  <MenuItem close={close} disabled={empty} onClick={() => editor.chain().focus().toConstantCase().run()}>CONSTANT_CASE</MenuItem>
                 </>
+              )}
+            </Dropdown>
+            <Dropdown label="✦" title="Text effects: weight, spacing, small caps, underline styles, keys, spoilers, labels" wide>
+              {(close) => (
+                <div className="note-dd-cols">
+                  <div>
+                    <MenuLabel>Weight</MenuLabel>
+                    {FONT_WEIGHTS.map(([l, v]) => (
+                      <MenuItem key={v} close={close} active={tStyle.fontWeight === v} onClick={() => editor.chain().focus().setMark('textStyle', { fontWeight: v }).run()}>
+                        <span style={{ fontWeight: v }}>{l}</span>
+                      </MenuItem>
+                    ))}
+                    <MenuLabel>Letter spacing</MenuLabel>
+                    {LETTER_SPACINGS.map(([l, v]) => (
+                      <MenuItem key={l} close={close} active={(tStyle.letterSpacing || null) === v} onClick={() => editor.chain().focus().setMark('textStyle', { letterSpacing: v }).removeEmptyTextStyle().run()}>
+                        <span style={{ letterSpacing: v || undefined }}>{l}</span>
+                      </MenuItem>
+                    ))}
+                  </div>
+                  <div>
+                    <MenuLabel>Style</MenuLabel>
+                    <MenuItem close={close} active={tStyle.fontVariant === 'small-caps'} onClick={() => editor.chain().focus().setMark('textStyle', { fontVariant: tStyle.fontVariant === 'small-caps' ? null : 'small-caps' }).removeEmptyTextStyle().run()}>
+                      <span style={{ fontVariant: 'small-caps' }}>Small Caps</span>
+                    </MenuItem>
+                    {DECORATIONS.map(([l, v]) => (
+                      <MenuItem key={v} close={close} active={tStyle.textDecoration === v} onClick={() => editor.chain().focus().setMark('textStyle', { textDecoration: tStyle.textDecoration === v ? null : v }).removeEmptyTextStyle().run()}>
+                        <span style={{ textDecoration: v }}>{l}</span>
+                      </MenuItem>
+                    ))}
+                    <MenuItem close={close} active={editor.isActive('kbd')} onClick={run((c) => c.toggleKbd())}><kbd className="note-kbd">Ctrl</kbd> Keyboard key</MenuItem>
+                    <MenuItem close={close} active={editor.isActive('spoiler')} onClick={run((c) => c.toggleSpoiler())}>▒ Spoiler (blur until hover)</MenuItem>
+                    <MenuLabel>Label</MenuLabel>
+                    <div className="note-tag-row">
+                      {TAG_COLORS.map((t) => (
+                        <button key={t.id} type="button" className="note-tag" data-tag={t.id} onClick={() => { editor.chain().focus().setTagLabel(t.id).run(); close(); }}>{t.label}</button>
+                      ))}
+                    </div>
+                    {editor.isActive('tagLabel') && <MenuItem close={close} onClick={run((c) => c.unsetTagLabel())}>Remove label</MenuItem>}
+                    <MenuSep />
+                    <MenuItem close={close} onClick={() => editor.chain().focus().setMark('textStyle', { fontWeight: null, letterSpacing: null, fontVariant: null, textDecoration: null }).removeEmptyTextStyle().unsetMark('kbd').unsetMark('spoiler').unsetMark('tagLabel').run()}>Clear text effects</MenuItem>
+                  </div>
+                </div>
               )}
             </Dropdown>
           </div>
@@ -448,6 +653,37 @@ export default function NoteEditor({ content, editable = true, onUpdate, onEdito
                   <MenuItem close={close} active={para.dir !== 'rtl'} onClick={() => editor.chain().focus().setTextDirection(null).run()}>Left to right</MenuItem>
                   <MenuItem close={close} active={para.dir === 'rtl'} onClick={() => editor.chain().focus().setTextDirection('rtl').run()}>Right to left</MenuItem>
                 </>
+              )}
+            </Dropdown>
+            <Dropdown label="▤" title="Block style: drop cap, shading, accent bar, box, quote and divider styles" wide>
+              {(close) => (
+                <div className="note-dd-cols">
+                  <div>
+                    <MenuLabel>Paragraph</MenuLabel>
+                    <MenuItem close={close} active={Boolean(para.dropCap)} onClick={() => editor.chain().focus().setBlockStyle('dropCap', true).run()}>Drop cap</MenuItem>
+                    <MenuItem close={close} active={Boolean(para.accentBar)} onClick={() => editor.chain().focus().setBlockStyle('accentBar', true).run()}>Accent bar on the left</MenuItem>
+                    <MenuItem close={close} active={Boolean(para.boxed)} onClick={() => editor.chain().focus().setBlockStyle('boxed', true).run()}>Box around it</MenuItem>
+                    <MenuLabel>Shading</MenuLabel>
+                    <ColorGrid colors={HIGHLIGHT_COLORS} value={para.shade} close={close} clearLabel="No shading"
+                      onPick={(col) => editor.chain().focus().setBlockStyle('shade', col).run()}
+                      onClear={() => editor.chain().focus().setBlockStyle('shade', null).run()} />
+                  </div>
+                  <div>
+                    <MenuLabel>Quote style</MenuLabel>
+                    {QUOTE_STYLES.map(([l, v]) => (
+                      <MenuItem key={l} close={close} active={editor.isActive('blockquote') && (editor.getAttributes('blockquote').quoteStyle || null) === v} onClick={() => {
+                        if (!editor.isActive('blockquote')) editor.chain().focus().setBlockquote().run();
+                        editor.chain().focus().updateAttributes('blockquote', { quoteStyle: v }).run();
+                      }}>❝ {l}</MenuItem>
+                    ))}
+                    <MenuLabel>Insert divider</MenuLabel>
+                    {LINE_STYLES.map(([l, v]) => (
+                      <MenuItem key={l} close={close} onClick={() => editor.chain().focus().setHorizontalRuleStyle(v).run()}>
+                        <span className="note-hr-sample" data-style={v || undefined} /> {l}
+                      </MenuItem>
+                    ))}
+                  </div>
+                </div>
               )}
             </Dropdown>
           </div>
@@ -535,6 +771,10 @@ export default function NoteEditor({ content, editable = true, onUpdate, onEdito
                       onPick={(col) => editor.chain().focus().setCellAttribute('backgroundColor', col).run()}
                       onClear={() => editor.chain().focus().setCellAttribute('backgroundColor', null).run()} />
                     <MenuSep />
+                    <MenuLabel>Sort rows by this column</MenuLabel>
+                    <MenuItem close={close} onClick={() => sortTableByColumn(editor, 1)}>A → Z / 0 → 9</MenuItem>
+                    <MenuItem close={close} onClick={() => sortTableByColumn(editor, -1)}>Z → A / 9 → 0</MenuItem>
+                    <MenuSep />
                     <MenuItem close={close} onClick={run((c) => c.fixTables())}>Repair table</MenuItem>
                     <MenuItem close={close} onClick={run((c) => c.deleteTable())}>Delete table</MenuItem>
                   </div>
@@ -543,6 +783,8 @@ export default function NoteEditor({ content, editable = true, onUpdate, onEdito
                 <>
                   <MenuLabel>Insert a table</MenuLabel>
                   <TableGridPicker onPick={(rows, cols, withHeaderRow) => { editor.chain().focus().insertTable({ rows, cols, withHeaderRow }).run(); close(); }} />
+                  <MenuSep />
+                  <MenuItem close={close} disabled={empty} onClick={() => textToTable(editor) || flash('Select lines separated by commas, tabs or |')}>Convert selected text to table</MenuItem>
                 </>
               ))}
             </Dropdown>
@@ -558,6 +800,16 @@ export default function NoteEditor({ content, editable = true, onUpdate, onEdito
                     <MenuItem close={close} onClick={run((c) => c.toggleBlockquote())}>❝ Quote</MenuItem>
                     <MenuItem close={close} onClick={run((c) => c.toggleCodeBlock())}>{'{ }'} Code block</MenuItem>
                     <MenuItem close={close} onClick={run((c) => c.setHardBreak())}>↵ Line break</MenuItem>
+                    <MenuItem close={close} onClick={run((c) => c.setDetails())}>▸ Collapsible section</MenuItem>
+                    <MenuItem close={close} onClick={run((c) => c.insertColumns(2))}>◫ Two columns</MenuItem>
+                    <MenuItem close={close} onClick={run((c) => c.insertColumns(3))}>▥ Three columns</MenuItem>
+                    <MenuItem close={close} onClick={() => setModal('link')}>📝 Link to another note…</MenuItem>
+                    <MenuItem close={close} onClick={insertQr}>▣ QR code…</MenuItem>
+                    <MenuItem close={close} onClick={() => editor.chain().focus().insertContent(`<p>${LOREM}</p>`).run()}>¶ Lorem ipsum text</MenuItem>
+                    <MenuLabel>Templates</MenuLabel>
+                    {TEMPLATES.map((t) => (
+                      <MenuItem key={t.id} close={close} onClick={() => editor.chain().focus().insertContent(t.html()).run()}>{t.icon} {t.label}</MenuItem>
+                    ))}
                     <MenuLabel>Callout box</MenuLabel>
                     {CALLOUT_TYPES.map((t) => (
                       <MenuItem key={t.id} close={close} onClick={() => (inCallout ? editor.chain().focus().setCalloutKind(t.id).run() : editor.chain().focus().setCallout(t.id).run())}>
@@ -591,10 +843,53 @@ export default function NoteEditor({ content, editable = true, onUpdate, onEdito
               >
                 {CODE_LANGS.map((l) => <option key={l} value={l}>{l}</option>)}
               </select>
+              {tb(false, async () => {
+                try {
+                  await navigator.clipboard.writeText(editor.state.selection.$from.parent.textContent);
+                  flash('Code copied');
+                } catch {
+                  flash('Clipboard not available');
+                }
+              }, '⧉ Copy', 'Copy this code block')}
+              {tb(!wrapCode, () => setWrapCode((v) => !v), '↔', wrapCode ? 'Long lines wrap — click to scroll them instead' : 'Long lines scroll — click to wrap them')}
             </div>
           )}
 
           <div className="note-toolbar-group">
+            <Dropdown label="🛠" title="Tools: checklists, sort and tidy lines, move blocks, calculate" wide>
+              {(close) => (
+                <div className="note-dd-cols">
+                  <div>
+                    <MenuLabel>Checklists {empty ? '(whole note)' : '(selection)'}</MenuLabel>
+                    <MenuItem close={close} disabled={!tasks.total} onClick={run((c) => c.setAllTasks(true))}>☑ Tick all items</MenuItem>
+                    <MenuItem close={close} disabled={!tasks.total} onClick={run((c) => c.setAllTasks(false))}>☐ Untick all items</MenuItem>
+                    <MenuItem close={close} disabled={!tasks.done} onClick={run((c) => c.completedTasksToBottom())}>⇣ Move done items to bottom</MenuItem>
+                    <MenuItem close={close} disabled={!tasks.done} onClick={run((c) => c.removeCompletedTasks())}>✕ Remove done items</MenuItem>
+                    <MenuLabel>Lines {empty ? '(this list or whole note)' : '(selection)'}</MenuLabel>
+                    <MenuItem close={close} onClick={run((c) => c.sortLines(1))}>Sort A → Z</MenuItem>
+                    <MenuItem close={close} onClick={run((c) => c.sortLines(-1))}>Sort Z → A</MenuItem>
+                    <MenuItem close={close} onClick={run((c) => c.reverseLines())}>Reverse order</MenuItem>
+                    <MenuItem close={close} onClick={() => editor.chain().focus().removeDuplicateLines().run() || flash('No duplicate lines')}>Remove duplicate lines</MenuItem>
+                    <MenuItem close={close} onClick={() => editor.chain().focus().removeEmptyLines().run() || flash('No empty lines')}>Remove empty lines</MenuItem>
+                    <MenuItem close={close} onClick={() => editor.chain().focus().trimSpaces().run() || flash('No extra spaces')}>Trim extra spaces</MenuItem>
+                    <MenuItem close={close} disabled={empty} onClick={() => editor.chain().focus().joinLines().run() || flash('Select two or more paragraphs')}>Join lines into one</MenuItem>
+                  </div>
+                  <div>
+                    <MenuLabel>This block</MenuLabel>
+                    <MenuItem close={close} shortcut="Alt+↑" onClick={run((c) => c.moveBlock(-1))}>Move up</MenuItem>
+                    <MenuItem close={close} shortcut="Alt+↓" onClick={run((c) => c.moveBlock(1))}>Move down</MenuItem>
+                    <MenuItem close={close} shortcut="Ctrl+⇧+D" onClick={run((c) => c.duplicateBlock())}>Duplicate</MenuItem>
+                    <MenuItem close={close} shortcut="Ctrl+⇧+K" onClick={run((c) => c.deleteBlock())}>Delete</MenuItem>
+                    <MenuLabel>Maths</MenuLabel>
+                    <MenuItem close={close} disabled={empty} onClick={calcSelection}>🧮 Calculate selection (= answer)</MenuItem>
+                    <MenuLabel>Tidy the whole note</MenuLabel>
+                    <MenuItem close={close} onClick={() => { editor.chain().focus().selectAll().unsetHighlight().run(); flash('Highlights removed'); }}>Remove all highlights</MenuItem>
+                    <MenuItem close={close} onClick={() => { editor.chain().focus().selectAll().unsetLink().run(); flash('Links removed'); }}>Remove all links</MenuItem>
+                    <MenuItem close={close} onClick={() => { editor.chain().focus().selectAll().unsetAllMarks().run(); flash('Text formatting cleared'); }}>Clear all text formatting</MenuItem>
+                  </div>
+                </div>
+              )}
+            </Dropdown>
             {tb(Boolean(find), () => setFind(find ? null : { replace: false }), '🔍', 'Find & replace (Ctrl+F / Ctrl+H)')}
             {tb(outline, () => setOutline((v) => !v), '☷', 'Document outline')}
             <Dropdown label="⋯" title="More tools" wide>
@@ -611,7 +906,24 @@ export default function NoteEditor({ content, editable = true, onUpdate, onEdito
                     <MenuItem close={close} onClick={() => download(jsonToMarkdown(editor.getJSON()), `${safeName}.md`, 'text/markdown')}>Download Markdown</MenuItem>
                     <MenuItem close={close} onClick={() => download(jsonToText(editor.getJSON()), `${safeName}.txt`, 'text/plain')}>Download plain text</MenuItem>
                     <MenuItem close={close} onClick={() => download(`<!doctype html><meta charset="utf-8"><title>${safeName}</title>${editor.getHTML()}`, `${safeName}.html`, 'text/html')}>Download HTML</MenuItem>
+                    <MenuItem close={close} onClick={exportWord}>Download Word (.doc)</MenuItem>
                     <MenuItem close={close} onClick={() => window.print()} shortcut="Ctrl+P">Print</MenuItem>
+                    <MenuItem close={close} onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(window.location.href);
+                        flash('Link to this note copied');
+                      } catch {
+                        flash('Clipboard not available');
+                      }
+                    }}>Copy link to this note</MenuItem>
+                    <MenuLabel>Versions</MenuLabel>
+                    <MenuItem close={close} disabled={!noteId} onClick={() => flash(saveSnapshot(noteId, editor.getHTML(), words) ? 'Snapshot saved' : 'Not enough browser storage for a snapshot')}>Save snapshot</MenuItem>
+                    <MenuItem close={close} disabled={!noteId} onClick={() => setModal('snapshots')}>View & restore snapshots…</MenuItem>
+                    <MenuLabel>Tools</MenuLabel>
+                    <MenuItem close={close} active={speaking} onClick={readAloud}>{speaking ? '⏹ Stop reading' : `🔊 Read ${empty ? 'note' : 'selection'} aloud`}</MenuItem>
+                    <MenuItem close={close} active={dictating} onClick={toggleDictation}>{dictating ? '⏹ Stop voice typing' : '🎤 Voice typing'}</MenuItem>
+                    <MenuItem close={close} onClick={() => setModal('stats')}>📊 Note statistics</MenuItem>
+                    <MenuItem close={close} active={goal > 0} onClick={askGoal}>🎯 Word goal{goal ? ` (${goal})` : '…'}</MenuItem>
                     <MenuLabel>Select</MenuLabel>
                     <MenuItem close={close} onClick={run((c) => c.selectAll())} shortcut="Ctrl+A">Select all</MenuItem>
                   </div>
@@ -619,6 +931,10 @@ export default function NoteEditor({ content, editable = true, onUpdate, onEdito
                     <MenuLabel>View</MenuLabel>
                     <MenuItem close={close} active={fullscreen} onClick={() => setFullscreen((v) => !v)} shortcut="Esc exits">Focus mode (full screen)</MenuItem>
                     <MenuItem close={close} active={outline} onClick={() => setOutline((v) => !v)}>Document outline</MenuItem>
+                    <MenuItem close={close} active={typewriter} onClick={() => setTypewriter((v) => !v)}>Typewriter scrolling</MenuItem>
+                    <MenuItem close={close} active={focusPara} onClick={() => setFocusPara((v) => !v)}>Focus on current paragraph</MenuItem>
+                    <MenuItem close={close} active={showMarks} onClick={() => setShowMarks((v) => !v)}>Show formatting marks ¶</MenuItem>
+                    <MenuItem close={close} active={lineNumbers} onClick={() => setLineNumbers((v) => !v)}>Paragraph numbers</MenuItem>
                     <MenuLabel>Page width</MenuLabel>
                     {PAGE_WIDTHS.map(([l, v]) => (
                       <MenuItem key={v} close={close} active={pageWidth === v} onClick={() => setPageWidth(v)}>{l}</MenuItem>
@@ -688,7 +1004,10 @@ export default function NoteEditor({ content, editable = true, onUpdate, onEdito
       <div className="note-editor-body">
         {outline && (
           <aside className="note-outline">
-            <div className="note-outline-title">Outline</div>
+            <div className="note-outline-title">
+              Outline
+              <button type="button" className="note-outline-close" onClick={() => setOutline(false)} aria-label="Close outline">×</button>
+            </div>
             {headings.length === 0 && <p className="note-outline-empty">Headings you add show up here.</p>}
             {headings.map((h) => (
               <button
@@ -730,9 +1049,18 @@ export default function NoteEditor({ content, editable = true, onUpdate, onEdito
 
       <div className="note-statusbar">
         <span>{words} word{words === 1 ? '' : 's'}</span>
-        <span>{chars} characters</span>
-        <span>{editor.state.doc.textContent.replace(/\s/g, '').length} without spaces</span>
-        <span>{editor.state.doc.childCount} blocks</span>
+        <span className="note-stat-extra">{chars} characters</span>
+        <span className="note-stat-extra">{editor.state.doc.textContent.replace(/\s/g, '').length} without spaces</span>
+        <span className="note-stat-extra">{editor.state.doc.childCount} blocks</span>
+        {tasks.total > 0 && <span title="Checklist items done">☑ {tasks.done}/{tasks.total}</span>}
+        {goal > 0 && (
+          <button type="button" className="note-goal" onClick={askGoal} title="Word goal — click to change">
+            <span className="note-goal-bar"><span style={{ width: `${Math.min(100, (words / goal) * 100)}%` }} /></span>
+            {words >= goal ? `🎯 Goal reached (${goal})` : `${words}/${goal}`}
+          </button>
+        )}
+        {speaking && <button type="button" className="note-status-sel note-status-btn" onClick={readAloud}>🔊 Reading… stop</button>}
+        {dictating && <button type="button" className="note-status-sel note-status-btn" onClick={toggleDictation}>🎤 Listening… stop</button>}
         <span>~{Math.max(1, Math.round(words / 220))} min read</span>
         {selWords > 0 && <span className="note-status-sel">{selWords} selected</span>}
         {painter && <span className="note-status-sel">🖌 Select text to paste formatting (click 🖌 to cancel)</span>}
@@ -740,6 +1068,31 @@ export default function NoteEditor({ content, editable = true, onUpdate, onEdito
       </div>
 
       {toast && <div className="note-toast">{toast}</div>}
+
+      {modal === 'stats' && <StatsModal editor={editor} onClose={() => setModal(null)} />}
+      {modal === 'link' && (
+        <NoteLinkPicker
+          onClose={() => setModal(null)}
+          onPick={(n) => {
+            const href = `/dashboard/notes/${n.uuid}`;
+            const c = editor.chain().focus();
+            if (empty) c.insertContent({ type: 'text', text: n.title || 'Untitled', marks: [{ type: 'link', attrs: { href, target: '_self' } }] }).run();
+            else c.setLink({ href, target: '_self' }).run();
+            setModal(null);
+          }}
+        />
+      )}
+      {modal === 'snapshots' && (
+        <SnapshotsModal
+          noteId={noteId}
+          onClose={() => setModal(null)}
+          onRestore={(html) => {
+            editor.chain().focus().setContent(html, { emitUpdate: true }).run();
+            setModal(null);
+            flash('Snapshot restored');
+          }}
+        />
+      )}
 
       {showShortcuts && (
         <div className="modal-overlay" onClick={() => setShowShortcuts(false)}>

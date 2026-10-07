@@ -12,6 +12,8 @@ export const KINDS = {
   task: { label: 'Tasks', icon: 'fa-solid fa-list-check' },
   code: { label: 'Code', icon: 'fa-solid fa-code' },
   calendar: { label: 'Calendar', icon: 'fa-solid fa-calendar-days' },
+  expense: { label: 'Expenses', icon: 'fa-solid fa-wallet' },
+  routine: { label: 'Routine', icon: 'fa-solid fa-sun' },
   download: { label: 'Downloads', icon: 'fa-solid fa-cloud-arrow-down' },
   photo: { label: 'Photos', icon: 'fa-solid fa-image' },
   pdf: { label: 'PDFs', icon: 'fa-solid fa-file-pdf' },

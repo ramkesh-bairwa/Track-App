@@ -46,6 +46,9 @@ const SPECIAL = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Emits .next/standalone: a self-contained server with only the
+  // node_modules it actually uses. The Docker image is built from it.
+  output: 'standalone',
   // Don't advertise the framework in every response.
   poweredByHeader: false,
   // archiver (used by the Backup feature) has a nested dependency with a

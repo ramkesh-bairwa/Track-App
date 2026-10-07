@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
   require_password_edit TINYINT(1) NOT NULL DEFAULT 0,
   sidebar_color VARCHAR(20) NULL,
   topbar_color VARCHAR(20) NULL,
+  content_color VARCHAR(20) NULL,
   google_email VARCHAR(255) NULL,
   google_refresh_token TEXT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -24,6 +25,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS require_password_delete TINYINT(1) NO
 ALTER TABLE users ADD COLUMN IF NOT EXISTS require_password_edit TINYINT(1) NOT NULL DEFAULT 0;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS sidebar_color VARCHAR(20) NULL;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS topbar_color VARCHAR(20) NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS content_color VARCHAR(20) NULL;
 -- Lets "Backup" upload to the signed-in user's own Google Drive (OAuth)
 -- instead of a service account's isolated storage.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS google_email VARCHAR(255) NULL;
@@ -402,6 +404,45 @@ ALTER TABLE user_devices ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMP NULL;
 -- (keys as in column_order: 'status', 'c:12', ...). Members can still hide
 -- more for themselves; that choice stays in their browser.
 ALTER TABLE task_boards ADD COLUMN IF NOT EXISTS hidden_columns JSON NULL;
+
+-- Daily Expenses (sidebar): one row per thing you paid for.
+CREATE TABLE IF NOT EXISTS expenses (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  spent_on DATE NOT NULL,
+  amount DECIMAL(12,2) NOT NULL,
+  description VARCHAR(255) NOT NULL,
+  category VARCHAR(20) NOT NULL DEFAULT 'other',
+  payment_method VARCHAR(20) NOT NULL DEFAULT 'cash',
+  note VARCHAR(500) NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_expenses_user_date (user_id, spent_on),
+  CONSTRAINT fk_expenses_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- Daily Routine (sidebar): the things you do each day, and which days
+-- (ISO weekdays as digits, 1 = Monday … 7 = Sunday) they're on.
+CREATE TABLE IF NOT EXISTS routine_items (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  time_of_day TIME NULL,
+  days VARCHAR(7) NOT NULL DEFAULT '1234567',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_routine_items_user (user_id),
+  CONSTRAINT fk_routine_items_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- A routine item ticked off on a day.
+CREATE TABLE IF NOT EXISTS routine_checks (
+  item_id INT NOT NULL,
+  user_id INT NOT NULL,
+  check_date DATE NOT NULL,
+  done_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (item_id, check_date),
+  KEY idx_routine_checks_user_date (user_id, check_date),
+  CONSTRAINT fk_routine_checks_item FOREIGN KEY (item_id) REFERENCES routine_items(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
 
 -- Optional leading "Sr. No." column in a track's table (new tracks start with it on).
 ALTER TABLE tracks ADD COLUMN IF NOT EXISTS show_serial TINYINT(1) NOT NULL DEFAULT 0;

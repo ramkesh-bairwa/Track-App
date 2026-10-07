@@ -360,6 +360,10 @@ export const SHORTCUTS = [
   ['Save now', 'Ctrl+S'],
   ['Undo / Redo', 'Ctrl+Z / Ctrl+Shift+Z'],
   ['Paste without formatting', 'Ctrl+Shift+V'],
+  ['Move block up / down', 'Alt+↑ / Alt+↓'],
+  ['Duplicate / delete block', 'Ctrl+Shift+D / Ctrl+Shift+K'],
+  ['Emoji', 'type :smile: :fire: :check: :rocket: …'],
+  ['Hashtag', 'type #idea — it is highlighted'],
   ['Command menu', 'type / at the start of a line'],
   ['Markdown', '# heading, - list, 1. list, [ ] task, > quote, ``` code, --- line'],
 ];
