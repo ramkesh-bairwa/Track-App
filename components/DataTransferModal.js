@@ -42,12 +42,7 @@ function ModuleList({ items, selected, onToggle, disabled }) {
     <div className="data-module-list">
       {items.map((m) => (
         <label key={m.key} className={`data-module${m.empty ? ' is-empty' : ''}`}>
-          <input
-            type="checkbox"
-            checked={selected.includes(m.key)}
-            disabled={disabled || m.empty}
-            onChange={() => onToggle(m.key)}
-          />
+          <input type="checkbox" checked={selected.includes(m.key)} disabled={disabled} onChange={() => onToggle(m.key)} />
           <span className="data-module-label">{m.label}</span>
           <span className="data-module-count">{m.count}</span>
         </label>
@@ -78,11 +73,20 @@ export default function DataTransferModal({ onClose }) {
     fetch('/api/data/summary')
       .then((res) => res.json())
       .then((json) => {
-        if (cancelled || !json.modules) return;
+        if (cancelled) return;
+        if (!json.modules) throw new Error();
         setSummary(json.modules);
-        setExportSel(json.modules.filter((m) => m.count > 0).map((m) => m.key));
+        // Pre-tick everything that has data (or whose count couldn't be read).
+        const withData = json.modules.filter((m) => m.count !== 0 && !m.unavailable).map((m) => m.key);
+        setExportSel(withData.length ? withData : json.modules.map((m) => m.key));
       })
-      .catch(() => !cancelled && setError('Could not load your data summary.'));
+      .catch(() => {
+        if (cancelled) return;
+        // Couldn't count — still offer every module so export keeps working.
+        const all = Object.entries(LABELS).map(([key, label]) => ({ key, label, count: null }));
+        setSummary(all);
+        setExportSel(all.map((m) => m.key));
+      });
     return () => {
       cancelled = true;
     };
@@ -99,6 +103,8 @@ export default function DataTransferModal({ onClose }) {
         const json = await res.json().catch(() => ({}));
         throw new Error(json.error || 'Export failed.');
       }
+      const skipped = res.headers.get('X-Skipped-Modules');
+      if (skipped) setError(`Exported, but couldn't read: ${skipped.split(',').map((k) => LABELS[k] || k).join(', ')}.`);
       const name = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') || '')?.[1] || 'mytrack-export.json';
       const url = URL.createObjectURL(await res.blob());
       const a = document.createElement('a');
@@ -152,7 +158,11 @@ export default function DataTransferModal({ onClose }) {
     }
   }
 
-  const exportItems = (summary || []).map((m) => ({ ...m, empty: m.count === 0 }));
+  const exportItems = (summary || []).map((m) => ({
+    ...m,
+    empty: m.count === 0,
+    count: m.unavailable ? 'not available' : m.count == null ? '' : m.count,
+  }));
   const importItems = file
     ? Object.keys(file.data.modules)
         .filter((k) => LABELS[k])

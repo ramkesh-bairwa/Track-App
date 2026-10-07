@@ -17,7 +17,18 @@ export const GET = withApiErrors(async (request) => {
   const conn = await getPool().getConnection();
   try {
     const modules = {};
-    for (const key of asked) modules[key] = await MODULES[key].export(conn, user.id);
+    const skipped = [];
+    for (const key of asked) {
+      try {
+        modules[key] = await MODULES[key].export(conn, user.id);
+      } catch (err) {
+        console.error(`Data export: ${key} skipped:`, err.message);
+        skipped.push(key);
+      }
+    }
+    if (!Object.keys(modules).length) {
+      return NextResponse.json({ error: 'None of the selected data could be read from this database.' }, { status: 500 });
+    }
     const file = {
       format: FORMAT,
       version: FORMAT_VERSION,
@@ -25,6 +36,7 @@ export const GET = withApiErrors(async (request) => {
       exported_from: request.headers.get('host') || '',
       exported_by: user.email,
       modules,
+      ...(skipped.length ? { skipped } : {}),
     };
     const stamp = new Date().toISOString().slice(0, 10);
     return new NextResponse(JSON.stringify(file), {
@@ -32,6 +44,7 @@ export const GET = withApiErrors(async (request) => {
         'Content-Type': 'application/json; charset=utf-8',
         'Content-Disposition': `attachment; filename="mytrack-${asked.length === MODULE_KEYS.length ? 'all' : asked.join('-')}-${stamp}.json"`,
         'Cache-Control': 'no-store',
+        ...(skipped.length ? { 'X-Skipped-Modules': skipped.join(',') } : {}),
       },
     });
   } finally {

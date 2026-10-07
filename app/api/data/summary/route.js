@@ -14,7 +14,13 @@ export const GET = withApiErrors(async () => {
   try {
     const modules = [];
     for (const [key, mod] of Object.entries(MODULES)) {
-      modules.push({ key, label: mod.label, count: Number(await mod.count(conn, user.id)) });
+      // One unreadable module (e.g. its table is missing in an older database) mustn't hide the rest.
+      try {
+        modules.push({ key, label: mod.label, count: Number(await mod.count(conn, user.id)) });
+      } catch (err) {
+        console.error(`Data summary: ${key} unavailable:`, err.message);
+        modules.push({ key, label: mod.label, count: null, unavailable: true });
+      }
     }
     return NextResponse.json({ modules });
   } finally {

@@ -8250,9 +8250,9 @@ button.note-tag {
 .data-module:hover {
   background: var(--panel-raised);
 }
-.data-module.is-empty {
-  opacity: 0.5;
-  cursor: default;
+.data-module.is-empty .data-module-label,
+.data-module.is-empty .data-module-count {
+  color: var(--text-faint);
 }
 .data-module-label {
   flex: 1;
