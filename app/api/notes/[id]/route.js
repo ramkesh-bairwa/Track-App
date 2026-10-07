@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-import { getCurrentUser, verifyPassword } from '@/lib/auth';
+import { getCurrentUser } from '@/lib/auth';
 import { withApiErrors } from '@/lib/apiError';
-import { hit, reset } from '@/lib/rateLimit';
+import { checkDeletePassword } from '@/lib/deletePassword';
 
 async function assertOwnership(noteId, userId) {
   const rows = await query('SELECT id FROM notes WHERE id = ? AND user_id = ?', [noteId, userId]);
@@ -93,22 +93,8 @@ export const DELETE = withApiErrors(async (request, { params }) => {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  // Deleting a note always needs a password: the privacy password if one is
-  // set (Settings → Privacy), otherwise the account's login password.
-  const limitKey = `note-delete:${user.id}`;
-  const limit = hit(limitKey, { max: 10, windowMs: 15 * 60 * 1000 });
-  if (limit.limited) {
-    return NextResponse.json(
-      { error: 'Too many wrong passwords. Try again in a few minutes.' },
-      { status: 429, headers: { 'Retry-After': String(limit.retryAfter) } }
-    );
-  }
-  const body = await request.json().catch(() => ({}));
-  const [pw] = await query('SELECT password, action_password FROM users WHERE id = ?', [user.id]);
-  if (!pw || !(await verifyPassword(String(body.password || ''), pw.action_password || pw.password))) {
-    return NextResponse.json({ error: 'Incorrect password.' }, { status: 403 });
-  }
-  reset(limitKey);
+  const wrongPassword = await checkDeletePassword(request, user.id);
+  if (wrongPassword) return wrongPassword;
 
   const descendants = await query(
     `WITH RECURSIVE descendants AS (

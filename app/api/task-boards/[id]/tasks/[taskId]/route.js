@@ -16,6 +16,7 @@ import {
   logActivity,
 } from '@/lib/taskServer';
 import { taskCollaborators } from '@/lib/taskConfig';
+import { checkDeletePassword } from '@/lib/deletePassword';
 
 async function loadTask(params, user) {
   const access = await getBoardAccess(params.id, user);
@@ -89,6 +90,8 @@ export const DELETE = withApiErrors(async (request, { params }) => {
   if (!access.canDelete) {
     return NextResponse.json({ error: "You don't have permission to delete tasks on this board." }, { status: 403 });
   }
+  const wrongPassword = await checkDeletePassword(request, user.id);
+  if (wrongPassword) return wrongPassword;
 
   const conn = await getPool().getConnection();
   try {

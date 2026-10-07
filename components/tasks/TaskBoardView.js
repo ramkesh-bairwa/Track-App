@@ -15,6 +15,7 @@ import TaskBoardSettings from '@/components/tasks/TaskBoardSettings';
 import CreateUserForm from '@/components/tasks/CreateUserForm';
 import ExportMenu from '@/components/ExportMenu';
 import ConfirmModal from '@/components/ConfirmModal';
+import PasswordConfirmModal from '@/components/PasswordConfirmModal';
 import { taskBoardExportTable } from '@/lib/taskExport';
 
 // Inline editors rendered by renderCell itself (custom columns use ColumnInput).
@@ -354,9 +355,10 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
     reload();
   }
 
-  async function deleteTask(task) {
+  async function deleteTask(task, password) {
     setError('');
-    await api(`${base}/tasks/${task.id}`, 'DELETE');
+    await api(`${base}/tasks/${task.id}`, 'DELETE', { password });
+    setConfirmDelete(null);
     await reload();
   }
 
@@ -1171,13 +1173,12 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
         </div>
       )}
       {confirmDelete && (
-        <ConfirmModal
+        <PasswordConfirmModal
           title="Delete this task?"
           message={`“${confirmDelete.title}” will be removed from the board. The deletion is logged${access.isAdmin ? ' and you can revert it from the activity log.' : ' and the admin can revert it.'}`}
           confirmLabel="Delete task"
-          danger
-          onConfirm={() => deleteTask(confirmDelete)}
-          onClose={() => setConfirmDelete(null)}
+          onConfirm={(password) => deleteTask(confirmDelete, password)}
+          onCancel={() => setConfirmDelete(null)}
         />
       )}
       {confirmLeave && (
