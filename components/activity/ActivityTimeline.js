@@ -69,7 +69,7 @@ function Timeline() {
       <div className="page-head">
         <div>
           <h1>Activity</h1>
-          <p>Everything you did in MyTrack, recorded automatically — tracks, entries, notes, tasks, code, downloads and more.</p>
+          <p>Everything you did in MyTrack, recorded automatically — tracks, entries, notes, tasks, code, downloads and more — plus changes others made to your boards and to tasks you&apos;re on.</p>
         </div>
         <div className="page-head-actions">
           <Link href="/dashboard/calendar" className="btn btn-sm"><i className="fa-solid fa-calendar-days" /> Calendar</Link>

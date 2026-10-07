@@ -30,12 +30,6 @@ status() { # status <state> <message>
     "$(date +%Y-%m-%dT%H:%M:%S%z)" "$1" "$CAPTURE_MODE" "$2" > "$SCREENSHOT_DIR/.status.json"
 }
 
-# Turned off from the Screenshots page.
-if [ -f "$SCREENSHOT_DIR/.paused" ]; then
-  status paused "Screenshots are turned off."
-  exit 0
-fi
-
 # Without Screen Recording permission macOS hands back only the wallpaper and
 # menu bar, so don't save those — say why instead.
 if [ "$SCREEN_PERMISSION" = denied ]; then

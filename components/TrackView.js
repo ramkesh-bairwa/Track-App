@@ -46,6 +46,7 @@ export default function TrackView({ track, initialColumns, initialEntries, user,
   const [trackIcon, setTrackIcon] = useState({ icon: track.icon, icon_type: track.icon_type });
   const [showIconEdit, setShowIconEdit] = useState(false);
   const [pageSize, setPageSize] = useState(track.page_size || 25);
+  const [showSerial, setShowSerial] = useState(Boolean(track.show_serial));
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState({});
@@ -813,6 +814,7 @@ export default function TrackView({ track, initialColumns, initialEntries, user,
             <table className="data-table" style={{ tableLayout: Object.keys(colWidths).length ? 'fixed' : 'auto' }}>
               <colgroup>
                 <col style={{ width: 28 }} />
+                {showSerial && <col style={{ width: 64 }} />}
                 {columns.map((col) => (
                   <col
                     key={col.id}
@@ -827,6 +829,7 @@ export default function TrackView({ track, initialColumns, initialEntries, user,
               <thead>
                 <tr>
                   <th className="row-drag-cell" />
+                  {showSerial && <th className="track-th-serial">Sr. No.</th>}
                   {columns.map((col) => (
                     <th
                       key={col.id}
@@ -879,7 +882,7 @@ export default function TrackView({ track, initialColumns, initialEntries, user,
                 </tr>
               </thead>
               <tbody>
-                {pageEntries.map((entry) => (
+                {pageEntries.map((entry, i) => (
                   <tr
                     key={entry.id}
                     className={`${draggedEntryId === entry.id ? 'row-dragging' : ''} ${dragOverEntryId === entry.id ? 'row-drag-over' : ''} ${entry.is_locked ? 'row-locked' : ''}`.trim() || undefined}
@@ -898,6 +901,8 @@ export default function TrackView({ track, initialColumns, initialEntries, user,
                         ⠿
                       </span>
                     </td>
+                    {/* Numbers the rows as listed, so filters and pages count 1, 2, 3… */}
+                    {showSerial && <td className="track-td-serial">{(currentPage - 1) * pageSize + i + 1}</td>}
                     {entry.is_locked ? (
                       <td colSpan={columns.length} className="cell-locked-row">
                         <div className="cell-inner">
@@ -962,7 +967,7 @@ export default function TrackView({ track, initialColumns, initialEntries, user,
                 ))}
                 {pageEntries.length === 0 && (
                   <tr>
-                    <td colSpan={columns.length + 2}>
+                    <td colSpan={columns.length + 2 + (showSerial ? 1 : 0)}>
                       <div className="cell-inner cell-empty" style={{ padding: '20px 14px' }}>
                         {entries.length === 0
                           ? 'No entries yet — add one with the form, or use quick row to type directly into the table.'
@@ -1091,11 +1096,12 @@ export default function TrackView({ track, initialColumns, initialEntries, user,
       )}
       {showSettings && (
         <TrackSettingsModal
-          track={track}
+          track={{ ...track, show_serial: showSerial }}
           columns={columns}
           onClose={() => setShowSettings(false)}
           onSaved={(json) => {
             setPageSize(json.page_size);
+            setShowSerial(json.show_serial);
             setColumns(json.columns);
           }}
         />

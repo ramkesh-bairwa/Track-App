@@ -12,7 +12,6 @@ CREATE TABLE IF NOT EXISTS users (
   require_password_edit TINYINT(1) NOT NULL DEFAULT 0,
   sidebar_color VARCHAR(20) NULL,
   topbar_color VARCHAR(20) NULL,
-  content_color VARCHAR(20) NULL,
   google_email VARCHAR(255) NULL,
   google_refresh_token TEXT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -25,7 +24,6 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS require_password_delete TINYINT(1) NO
 ALTER TABLE users ADD COLUMN IF NOT EXISTS require_password_edit TINYINT(1) NOT NULL DEFAULT 0;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS sidebar_color VARCHAR(20) NULL;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS topbar_color VARCHAR(20) NULL;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS content_color VARCHAR(20) NULL;
 -- Lets "Backup" upload to the signed-in user's own Google Drive (OAuth)
 -- instead of a service account's isolated storage.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS google_email VARCHAR(255) NULL;
@@ -405,41 +403,53 @@ ALTER TABLE user_devices ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMP NULL;
 -- more for themselves; that choice stays in their browser.
 ALTER TABLE task_boards ADD COLUMN IF NOT EXISTS hidden_columns JSON NULL;
 
--- Daily Expenses (sidebar): one row per thing you paid for.
-CREATE TABLE IF NOT EXISTS expenses (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  user_id INT NOT NULL,
-  spent_on DATE NOT NULL,
-  amount DECIMAL(12,2) NOT NULL,
-  description VARCHAR(255) NOT NULL,
-  category VARCHAR(20) NOT NULL DEFAULT 'other',
-  payment_method VARCHAR(20) NOT NULL DEFAULT 'cash',
-  note VARCHAR(500) NULL,
+-- Optional leading "Sr. No." column in a track's table (new tracks start with it on).
+ALTER TABLE tracks ADD COLUMN IF NOT EXISTS show_serial TINYINT(1) NOT NULL DEFAULT 0;
+
+-- Notes on task activity entries. The logged change itself never changes;
+-- adding or editing a note is logged as its own 'log_note' entry.
+ALTER TABLE task_activity ADD COLUMN IF NOT EXISTS note TEXT NULL;
+ALTER TABLE task_activity ADD COLUMN IF NOT EXISTS note_by INT NULL;
+ALTER TABLE task_activity ADD COLUMN IF NOT EXISTS note_at TIMESTAMP NULL;
+-- Throttle lookup for 'task_view' entries (one per person per task per 10 min).
+ALTER TABLE task_activity ADD INDEX IF NOT EXISTS idx_task_activity_view (task_id, user_id, action, created_at);
+
+-- Comments on task activity entries — a thread per log entry that any board
+-- member can add to. Adding / editing / deleting one is itself logged
+-- ('log_comment'), and @mentions notify the people named.
+CREATE TABLE IF NOT EXISTS task_comments (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  board_id INT NOT NULL,
+  activity_id BIGINT NOT NULL,
+  task_id INT NULL,
+  user_id INT NULL,
+  user_name VARCHAR(255) NULL,
+  body TEXT NOT NULL,
+  mentions JSON NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  KEY idx_expenses_user_date (user_id, spent_on),
-  CONSTRAINT fk_expenses_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  edited_at TIMESTAMP NULL,
+  deleted_at TIMESTAMP NULL,
+  KEY idx_task_comments_activity (activity_id),
+  CONSTRAINT fk_task_comments_board FOREIGN KEY (board_id) REFERENCES task_boards(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- Daily Routine (sidebar): the things you do each day, and which days
--- (ISO weekdays as digits, 1 = Monday … 7 = Sunday) they're on.
-CREATE TABLE IF NOT EXISTS routine_items (
-  id INT AUTO_INCREMENT PRIMARY KEY,
+-- In-app notifications (the 🔔 in the top bar) — e.g. "Ann mentioned you".
+CREATE TABLE IF NOT EXISTS notifications (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL,
+  actor_id INT NULL,
+  actor_name VARCHAR(255) NULL,
+  kind VARCHAR(30) NOT NULL,
   title VARCHAR(255) NOT NULL,
-  time_of_day TIME NULL,
-  days VARCHAR(7) NOT NULL DEFAULT '1234567',
+  body TEXT NULL,
+  url VARCHAR(500) NULL,
+  read_at TIMESTAMP NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  KEY idx_routine_items_user (user_id),
-  CONSTRAINT fk_routine_items_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  KEY idx_notifications_user (user_id, read_at, id),
+  CONSTRAINT fk_notifications_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- A routine item ticked off on a day.
-CREATE TABLE IF NOT EXISTS routine_checks (
-  item_id INT NOT NULL,
-  user_id INT NOT NULL,
-  check_date DATE NOT NULL,
-  done_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (item_id, check_date),
-  KEY idx_routine_checks_user_date (user_id, check_date),
-  CONSTRAINT fk_routine_checks_item FOREIGN KEY (item_id) REFERENCES routine_items(id) ON DELETE CASCADE
-) ENGINE=InnoDB;
+-- Comment attachments: the files (data URLs) and a small name/type/size list
+-- that the history loads instead of the files themselves.
+ALTER TABLE task_comments ADD COLUMN IF NOT EXISTS attachments LONGTEXT NULL;
+ALTER TABLE task_comments ADD COLUMN IF NOT EXISTS attachments_meta JSON NULL;

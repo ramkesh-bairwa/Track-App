@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
-import { PRIORITIES, MAX_TASK_FILE_BYTES } from '@/lib/taskConfig';
+import { useRef, useState } from 'react';
+import { PRIORITIES, MAX_TASK_FILE_BYTES, TASK_IMAGES_KEY, TASK_COLLABORATORS_KEY, taskCollaborators } from '@/lib/taskConfig';
 import { ColumnValue, formatDay, Pill } from '@/components/tasks/taskUi';
 import { statusColor, priorityColor } from '@/lib/taskConfig';
 import CreateUserForm from '@/components/tasks/CreateUserForm';
 import { safeFileUrl } from '@/lib/safeUrl';
+import TaskImagesInput, { TaskImagesView, imageFilesFrom } from '@/components/tasks/TaskImages';
 
 export function ColumnInput({ column, value, onChange }) {
   const options = (column.options || '').split(',').map((o) => o.trim()).filter(Boolean);
@@ -79,6 +80,27 @@ function FileInput({ value, onChange }) {
   );
 }
 
+// Board members (other than the assignee) the task is shared with.
+function CollaboratorsInput({ people, assigneeId, value, onChange }) {
+  const ids = Array.isArray(value) ? value : [];
+  const options = people.filter((p) => String(p.id) !== String(assigneeId ?? ''));
+  if (options.length === 0) return <p className="field-hint">Add more members to the board to share tasks with them.</p>;
+  return (
+    <div className="task-collab-picker">
+      {options.map((p) => (
+        <label key={p.id} className={`task-collab-chip${ids.includes(p.id) ? ' selected' : ''}`}>
+          <input
+            type="checkbox"
+            checked={ids.includes(p.id)}
+            onChange={(e) => onChange(e.target.checked ? [...ids, p.id] : ids.filter((id) => id !== p.id))}
+          />
+          {p.name}
+        </label>
+      ))}
+    </div>
+  );
+}
+
 // Add / edit / view a task. `readOnly` shows the same layout without inputs
 // for members who can see a task but not change it. `initial` prefills a new
 // task (e.g. a half-typed quick row moved into the full form).
@@ -100,6 +122,16 @@ export default function TaskModal({ board, columns, people, task, initial, readO
   const [error, setError] = useState('');
   const [creatingUser, setCreatingUser] = useState(false);
   const [newUser, setNewUser] = useState(null);
+  const addImagesRef = useRef(null);
+
+  // A screenshot pasted anywhere in the form is attached to the task.
+  function handlePaste(e) {
+    if (readOnly || !addImagesRef.current) return;
+    const files = imageFilesFrom(e.clipboardData);
+    if (files.length === 0) return;
+    e.preventDefault();
+    addImagesRef.current(files);
+  }
 
   // Admin only: create an account right here, add it to the board, and
   // assign this task to it.
@@ -144,7 +176,7 @@ export default function TaskModal({ board, columns, people, task, initial, readO
 
   return (
     <div className="modal-overlay" onClick={saving ? undefined : onClose}>
-      <form className="modal modal-lg task-modal" onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit}>
+      <form className="modal modal-lg task-modal" onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit} onPaste={handlePaste}>
         <div className="new-track-head">
           <h2>{isNew ? 'New task' : readOnly ? task.title : 'Edit task'}</h2>
           <button type="button" className="new-track-close" onClick={onClose} disabled={saving} title="Close">×</button>
@@ -157,6 +189,15 @@ export default function TaskModal({ board, columns, people, task, initial, readO
             <div><dt>Assignee</dt><dd>{assignee?.name || (task.assignee_id ? 'Former member' : 'Unassigned')}</dd></div>
             <div><dt>Due date</dt><dd>{task.due_date ? formatDay(task.due_date) : '—'}</dd></div>
             <div className="task-view-wide"><dt>Description</dt><dd style={{ whiteSpace: 'pre-wrap' }}>{task.description || '—'}</dd></div>
+            {taskCollaborators(task).length > 0 && (
+              <div className="task-view-wide">
+                <dt>Collaborators</dt>
+                <dd>{taskCollaborators(task).map((id) => people.find((p) => p.id === id)?.name || 'Former member').join(', ')}</dd>
+              </div>
+            )}
+            {task.data?.[TASK_IMAGES_KEY]?.length > 0 && (
+              <div className="task-view-wide"><dt>Images</dt><dd><TaskImagesView images={task.data[TASK_IMAGES_KEY]} /></dd></div>
+            )}
             {columns.map((col) => (
               <div key={col.id}><dt>{col.label}</dt><dd><ColumnValue column={col} value={task.data?.[col.field_key]} /></dd></div>
             ))}
@@ -237,6 +278,16 @@ export default function TaskModal({ board, columns, people, task, initial, readO
                 {' '}Click “{isNew ? 'Create task' : 'Save changes'}” to finish.
               </div>
             )}
+            <div className="field-group task-form-wide">
+              <label className="field-label">Collaborators</label>
+              <CollaboratorsInput
+                people={people}
+                assigneeId={form.assignee_id}
+                value={form.data[TASK_COLLABORATORS_KEY]}
+                onChange={(v) => setData(TASK_COLLABORATORS_KEY, v)}
+              />
+              <p className="field-hint">They can see this task and its history even on a private board, and update its status.</p>
+            </div>
             <div className="field-group">
               <label className="field-label">Due date</label>
               <input type="date" className="input" value={form.due_date || ''} onChange={(e) => set('due_date', e.target.value)} />
@@ -244,6 +295,10 @@ export default function TaskModal({ board, columns, people, task, initial, readO
             <div className="field-group task-form-wide">
               <label className="field-label">Description</label>
               <textarea className="input" rows={4} value={form.description} onChange={(e) => set('description', e.target.value)} />
+            </div>
+            <div className="field-group task-form-wide">
+              <label className="field-label">Images / screenshots</label>
+              <TaskImagesInput value={form.data[TASK_IMAGES_KEY]} onChange={(v) => setData(TASK_IMAGES_KEY, v)} addRef={addImagesRef} />
             </div>
             {columns.map((col) => (
               <div key={col.id} className={`field-group${col.field_type === 'textarea' || col.field_type === 'file' ? ' task-form-wide' : ''}`}>

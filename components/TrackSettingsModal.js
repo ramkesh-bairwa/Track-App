@@ -7,6 +7,7 @@ const PAGE_SIZES = [10, 25, 50, 100];
 
 export default function TrackSettingsModal({ track, columns, onClose, onSaved }) {
   const [pageSize, setPageSize] = useState(track.page_size || 25);
+  const [showSerial, setShowSerial] = useState(Boolean(track.show_serial));
   const [filterableIds, setFilterableIds] = useState(
     () => new Set(columns.filter((c) => c.is_filterable).map((c) => c.id))
   );
@@ -35,6 +36,7 @@ export default function TrackSettingsModal({ track, columns, onClose, onSaved })
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           page_size: Number(pageSize),
+          show_serial: showSerial,
           filterable_column_ids: Array.from(filterableIds),
           searchable_column_ids: Array.from(searchableIds),
         }),
@@ -68,6 +70,13 @@ export default function TrackSettingsModal({ track, columns, onClose, onSaved })
                 <option key={size} value={size}>{size}</option>
               ))}
             </select>
+          </div>
+
+          <div className="field-group">
+            <label className="checkbox-row">
+              <input type="checkbox" checked={showSerial} onChange={(e) => setShowSerial(e.target.checked)} />
+              <span>Show a <strong>Sr. No.</strong> column — numbers every row 1, 2, 3… at the start of the table.</span>
+            </label>
           </div>
 
           <p className="modal-section-title">Columns</p>

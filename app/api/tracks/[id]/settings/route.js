@@ -32,6 +32,8 @@ export const PATCH = withApiErrors(async (request, { params }) => {
       ? Math.min(200, Math.max(5, Math.round(body.page_size)))
       : null;
 
+  const showSerial = typeof body.show_serial === 'boolean' ? (body.show_serial ? 1 : 0) : null;
+
   const pool = getPool();
   const conn = await pool.getConnection();
   try {
@@ -39,6 +41,10 @@ export const PATCH = withApiErrors(async (request, { params }) => {
 
     if (pageSize !== null) {
       await conn.execute('UPDATE tracks SET page_size = ? WHERE id = ?', [pageSize, trackId]);
+    }
+
+    if (showSerial !== null) {
+      await conn.execute('UPDATE tracks SET show_serial = ? WHERE id = ?', [showSerial, trackId]);
     }
 
     if (filterableIds !== null) {
@@ -69,10 +75,10 @@ export const PATCH = withApiErrors(async (request, { params }) => {
     conn.release();
   }
 
-  const trackRows = await query('SELECT page_size FROM tracks WHERE id = ?', [trackId]);
+  const trackRows = await query('SELECT page_size, show_serial FROM tracks WHERE id = ?', [trackId]);
   const columns = await query(
     'SELECT * FROM track_columns WHERE track_id = ? ORDER BY position ASC, id ASC',
     [trackId]
   );
-  return NextResponse.json({ page_size: trackRows[0].page_size, columns });
+  return NextResponse.json({ page_size: trackRows[0].page_size, show_serial: Boolean(trackRows[0].show_serial), columns });
 });

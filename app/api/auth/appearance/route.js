@@ -39,15 +39,6 @@ export const PATCH = withApiErrors(async (request) => {
     values.push(topbar.value);
   }
 
-  if ('content_color' in body) {
-    const content = sanitizeColor(body.content_color);
-    if (!content.set) {
-      return NextResponse.json({ error: 'Page background color must be a hex value like #1f9d85.' }, { status: 400 });
-    }
-    fields.push('content_color = ?');
-    values.push(content.value);
-  }
-
   if (fields.length === 0) {
     return NextResponse.json({ error: 'Nothing to update.' }, { status: 400 });
   }
@@ -55,6 +46,6 @@ export const PATCH = withApiErrors(async (request) => {
   values.push(user.id);
   await query(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`, values);
 
-  const rows = await query('SELECT sidebar_color, topbar_color, content_color FROM users WHERE id = ?', [user.id]);
+  const rows = await query('SELECT sidebar_color, topbar_color FROM users WHERE id = ?', [user.id]);
   return NextResponse.json({ user: rows[0] });
 });

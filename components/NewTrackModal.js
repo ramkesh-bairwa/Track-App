@@ -19,6 +19,7 @@ export default function NewTrackModal({ parentId, parentName, onClose }) {
   const [viewType, setViewType] = useState(DEFAULT_VIEW_TYPE);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [showSerial, setShowSerial] = useState(true);
   const [templateId, setTemplateId] = useState(CUSTOM);
   const [search, setSearch] = useState('');
   const [group, setGroup] = useState('all');
@@ -72,6 +73,7 @@ export default function NewTrackModal({ parentId, parentName, onClose }) {
     if (name.trim()) params.set('name', name.trim());
     if (description.trim()) params.set('description', description.trim());
     if (template) params.set('template', template.id);
+    if (!showSerial) params.set('serial', '0');
     router.push(`/dashboard/tracks/new?${params.toString()}`);
     onClose();
   }
@@ -95,6 +97,7 @@ export default function NewTrackModal({ parentId, parentName, onClose }) {
           color: template.color,
           parent_id: parentId || null,
           view_type: viewType,
+          show_serial: showSerial,
           columns: template.columns.map((c) => ({
             label: c.label,
             field_type: c.field_type,
@@ -190,6 +193,10 @@ export default function NewTrackModal({ parentId, parentName, onClose }) {
                   placeholder="What this is for"
                 />
               </div>
+              <label className="checkbox-row" style={{ marginTop: 10 }}>
+                <input type="checkbox" checked={showSerial} onChange={(e) => setShowSerial(e.target.checked)} />
+                <span>Add a <strong>Sr. No.</strong> column — numbers every row 1, 2, 3… at the start of the table.</span>
+              </label>
             </div>
 
             <div className="new-track-picker-head">

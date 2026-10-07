@@ -1,19 +1,24 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { statusColor, priorityColor, PRIORITIES, orderTaskColumns } from '@/lib/taskConfig';
+import { statusColor, priorityColor, PRIORITIES, orderTaskColumns, TASK_IMAGES_KEY, taskCollaborators } from '@/lib/taskConfig';
 import { Avatar, Pill, ColumnValue, formatDay, timeAgo, formatDateTime, isOverdue } from '@/components/tasks/taskUi';
 import TaskModal, { ColumnInput } from '@/components/tasks/TaskModal';
 import TaskColumnBuilder, { blankColumn } from '@/components/tasks/TaskColumnBuilder';
 import TaskActivity from '@/components/tasks/TaskActivity';
+import BoardHistory from '@/components/tasks/BoardHistory';
+import { Pager, CommentComposer } from '@/components/tasks/ActivityEntry';
 import TaskImportModal from '@/components/tasks/TaskImportModal';
 import TaskBoardSettings from '@/components/tasks/TaskBoardSettings';
 import CreateUserForm from '@/components/tasks/CreateUserForm';
 import ExportMenu from '@/components/ExportMenu';
 import ConfirmModal from '@/components/ConfirmModal';
 import { taskBoardExportTable } from '@/lib/taskExport';
+
+// Inline editors rendered by renderCell itself (custom columns use ColumnInput).
+const BUILTIN_EDIT_KEYS = new Set(['title', 'priority', 'assignee', 'due']);
 
 function blankDraft(board) {
   return { title: '', description: '', status: board.statuses[0]?.name, priority: 'Medium', assignee_id: '', due_date: '', data: {} };
@@ -41,6 +46,7 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
   const [modal, setModal] = useState(null); // { mode: 'new' | 'edit' | 'view', task }
   const [editCell, setEditCell] = useState(null); // { taskId, key } being edited inline
   const [editValue, setEditValue] = useState(null); // in-progress value for a custom-column cell
+  const editRef = useRef(null); // the <td> currently being edited inline
   const [renameCol, setRenameCol] = useState(null); // custom column id being renamed from its header
   const [deleteCol, setDeleteCol] = useState(null); // custom column pending delete confirmation
   const [history, setHistory] = useState(null); // { task } | { task: null } for the whole board
@@ -61,6 +67,8 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
   const [draftSaving, setDraftSaving] = useState(false);
   const [hiddenCols, setHiddenCols] = useState(() => new Set()); // column keys this viewer hid from the listing
   const [showColumnPicker, setShowColumnPicker] = useState(false);
+  const [taskPage, setTaskPage] = useState(1);
+  const [commentPrompt, setCommentPrompt] = useState(null); // { activityId, title } after a save
 
   const { board, access, columns, people, tasks } = data;
   const base = `/api/task-boards/${board.uuid}`;
@@ -131,8 +139,9 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
       if (statusFilter && t.status !== statusFilter) return false;
       if (priorityFilter && t.priority !== priorityFilter) return false;
       if (assigneeFilter === 'me' && t.assignee_id !== me.id) return false;
+      if (assigneeFilter === 'shared' && !taskCollaborators(t).includes(me.id)) return false;
       if (assigneeFilter === 'none' && t.assignee_id) return false;
-      if (assigneeFilter && !['me', 'none'].includes(assigneeFilter) && String(t.assignee_id) !== assigneeFilter) return false;
+      if (assigneeFilter && !['me', 'shared', 'none'].includes(assigneeFilter) && String(t.assignee_id) !== assigneeFilter) return false;
       if (!q) return true;
       return (
         t.title.toLowerCase().includes(q) ||
@@ -177,6 +186,22 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
       .map((x) => x.t);
   }, [shown, sort, tableCols, board.statuses, peopleById]);
 
+  // The task list shows 10 at a time; any filter, search or sort change
+  // starts again from page 1.
+  const TASKS_PER_PAGE = 10;
+  useEffect(() => setTaskPage(1), [search, statusFilter, assigneeFilter, priorityFilter, sort]);
+  const taskPageCount = Math.max(1, Math.ceil(sorted.length / TASKS_PER_PAGE));
+  const currentTaskPage = Math.min(taskPage, taskPageCount);
+  const pageTasks = sorted.slice((currentTaskPage - 1) * TASKS_PER_PAGE, currentTaskPage * TASKS_PER_PAGE);
+
+  // Opening a task is logged as a "viewed" entry (the server keeps it to one
+  // per person per task every 10 minutes).
+  const viewedTaskId = modal?.task?.id;
+  useEffect(() => {
+    if (!viewedTaskId) return;
+    fetch(`${base}/tasks/${viewedTaskId}/view`, { method: 'POST', keepalive: true }).catch(() => {});
+  }, [viewedTaskId, base]);
+
   // Header click: ascending → descending → back to the board's own order.
   function toggleSort(key) {
     setSort((s) => (s?.key !== key ? { key, dir: 1 } : s.dir === 1 ? { key, dir: -1 } : null));
@@ -196,6 +221,14 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
     api(base, 'PATCH', { column_order: keys }).catch((err) => setError(err.message));
   }
 
+  // Every task save that changed something is logged; offer to comment on
+  // that log entry right away (optional — the card can be skipped).
+  // `kind` 'created' (a new task / an import) shows a centered popup; edits
+  // get the smaller corner card so quick changes aren't interrupted.
+  function askForComment(json, title, focus = true, kind = 'saved') {
+    if (json?.activity_id) setCommentPrompt({ activityId: json.activity_id, title, focus, kind });
+  }
+
   async function saveDraft() {
     if (!draft.title.trim()) {
       setError('A task needs a title.');
@@ -204,13 +237,15 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
     setDraftSaving(true);
     setError('');
     try {
-      await api(`${base}/tasks`, 'POST', {
+      const created = await api(`${base}/tasks`, 'POST', {
         ...draft,
         title: draft.title.trim(),
         assignee_id: draft.assignee_id === '' ? null : Number(draft.assignee_id),
         due_date: draft.due_date || null,
       });
-      // Keep the quick row open with a fresh line for the next task.
+      // Keep the quick row open with a fresh line for the next task — the
+      // comment card appears without stealing focus from it.
+      askForComment(created, draft.title.trim(), false);
       setDraft(blankDraft(board));
       await reload();
     } catch (err) {
@@ -230,7 +265,8 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
   }
 
   async function importTasks(list, fileName, newColumns) {
-    await api(`${base}/tasks/import`, 'POST', { tasks: list, fileName, newColumns });
+    const json = await api(`${base}/tasks/import`, 'POST', { tasks: list, fileName, newColumns });
+    askForComment(json, `${list.length} imported task${list.length === 1 ? '' : 's'}`, true, 'created');
     await reload();
   }
 
@@ -291,11 +327,11 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
     return map;
   }, [tasks, board.statuses]);
 
-  const canChangeStatus = (task) => access.canEdit || task.assignee_id === me.id;
+  const canChangeStatus = (task) => access.canEdit || task.assignee_id === me.id || taskCollaborators(task).includes(me.id);
 
   async function saveTask(task, values) {
-    if (task) await api(`${base}/tasks/${task.id}`, 'PATCH', values);
-    else await api(`${base}/tasks`, 'POST', values);
+    const json = task ? await api(`${base}/tasks/${task.id}`, 'PATCH', values) : await api(`${base}/tasks`, 'POST', values);
+    askForComment(json, values.title || task?.title, true, task ? 'saved' : 'created');
     await reload();
   }
 
@@ -311,7 +347,7 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
     setError('');
     setData((d) => ({ ...d, tasks: d.tasks.map((t) => (t.id === task.id ? { ...t, status } : t)) }));
     try {
-      await api(`${base}/tasks/${task.id}`, 'PATCH', { status });
+      askForComment(await api(`${base}/tasks/${task.id}`, 'PATCH', { status }), task.title);
     } catch (err) {
       setError(err.message);
     }
@@ -334,6 +370,22 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
     setModal({ mode: access.canEdit ? 'edit' : 'view', task });
   }
 
+  // Lets every history entry show its task's live status and edit the
+  // task's fields in place (double-click) — keys are the logged field keys.
+  const historyTaskActions = {
+    tasksById: new Map(tasks.map((t) => [t.id, t])),
+    statuses: board.statuses,
+    columns,
+    canChangeStatus,
+    canEdit: access.canEdit,
+    onStatusChange: quickStatus,
+    onEditField: (task, key, value) => {
+      if (key === 'status') return quickStatus(task, value);
+      const cellKey = { assignee_id: 'assignee', due_date: 'due' }[key] || (key.startsWith('data.') ? key.slice(5) : key);
+      return commitCell(task, cellKey, value);
+    },
+  };
+
   // ---- inline cell editing (double-click a cell to edit it in place) ----
   const isEditing = (task, key) => editCell && editCell.taskId === task.id && editCell.key === key;
   function startEdit(task, key, initial) {
@@ -345,6 +397,33 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
     setEditCell(null);
     setEditValue(null);
   }
+
+  // Custom-column editors don't take autoFocus, so focus the field once it
+  // opens — that way clicking away always blurs it and saves.
+  useEffect(() => {
+    if (!editCell || BUILTIN_EDIT_KEYS.has(editCell.key)) return;
+    editRef.current?.querySelector('input:not([type=file]), select, textarea, button')?.focus();
+  }, [editCell]);
+
+  // Clicking anywhere outside the open editor saves it and closes it.
+  useEffect(() => {
+    if (!editCell) return undefined;
+    function onDown(e) {
+      const cell = editRef.current;
+      if (!cell || cell.contains(e.target)) return;
+      const active = document.activeElement;
+      // A focused field saves through its own onBlur; a custom editor whose
+      // field never got focus (e.g. a file picker) is saved directly.
+      if (active && cell.contains(active)) active.blur();
+      else if (!BUILTIN_EDIT_KEYS.has(editCell.key)) {
+        const task = tasks.find((x) => x.id === editCell.taskId);
+        if (task) commitCell(task, editCell.key, editValue);
+        else cancelEdit();
+      } else cancelEdit();
+    }
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  });
   async function commitCell(task, key, rawValue) {
     let patch;
     let optimistic;
@@ -362,6 +441,11 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
       if (id === (task.assignee_id ?? null)) return cancelEdit();
       patch = { assignee_id: id };
       optimistic = { assignee_id: id };
+    } else if (key === 'description') {
+      const v = String(rawValue ?? '').trim();
+      if (v === (task.description || '')) return cancelEdit();
+      patch = { description: v };
+      optimistic = { description: v };
     } else if (key === 'due') {
       const v = rawValue || null;
       if ((v || null) === (task.due_date || null)) return cancelEdit();
@@ -378,7 +462,7 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
     cancelEdit();
     setData((d) => ({ ...d, tasks: d.tasks.map((x) => (x.id === task.id ? { ...x, ...optimistic } : x)) }));
     try {
-      await api(`${base}/tasks/${task.id}`, 'PATCH', patch);
+      askForComment(await api(`${base}/tasks/${task.id}`, 'PATCH', patch), optimistic.title || task.title);
     } catch (err) {
       setError(err.message);
     }
@@ -388,14 +472,27 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
   const admin = people.find((p) => p.is_admin);
 
   function renderCell(col, t) {
-    const editTitle = access.canEdit ? 'Double-click to edit' : undefined;
+    // The whole cell is the double-click target; hovering its text
+    // (`.task-lift`) lifts it with a soft glow so it reads as editable.
+    const editable = (key, initial, className) => {
+      if (isEditing(t, key)) return { className, ref: editRef, onDoubleClick: (e) => e.stopPropagation() };
+      if (!access.canEdit) return { className, onDoubleClick: (e) => e.stopPropagation() };
+      return {
+        className: className ? `${className} task-cell-editable` : 'task-cell-editable',
+        title: 'Double-click to edit',
+        onDoubleClick: (e) => {
+          e.stopPropagation();
+          startEdit(t, key, initial);
+        },
+      };
+    };
     const escKey = (e) => {
       if (e.key === 'Escape') cancelEdit();
     };
     switch (col.key) {
       case 'title':
         return (
-          <td key={col.key} className="task-title-cell" onDoubleClick={(e) => e.stopPropagation()}>
+          <td key={col.key} {...editable('title', undefined, 'task-title-cell')}>
             {isEditing(t, 'title') ? (
               <input
                 className="input input-sm"
@@ -409,7 +506,12 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
               />
             ) : (
               <>
-                <span className="task-title-text" onDoubleClick={() => startEdit(t, 'title')} title={editTitle} role="button">{t.title}</span>
+                <span className="task-title-text task-lift" title={t.title.length > 90 ? t.title : undefined}>{t.title}</span>
+                {t.data?.[TASK_IMAGES_KEY]?.length > 0 && (
+                  <span className="task-image-count" title={`${t.data[TASK_IMAGES_KEY].length} image(s) attached`}>
+                    🖼 {t.data[TASK_IMAGES_KEY].length}
+                  </span>
+                )}
                 {t.description && <div className="task-desc">{t.description}</div>}
               </>
             )}
@@ -436,7 +538,7 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
         );
       case 'priority':
         return (
-          <td key={col.key} onDoubleClick={(e) => e.stopPropagation()}>
+          <td key={col.key} {...editable('priority')}>
             {isEditing(t, 'priority') ? (
               <select className="input input-sm" defaultValue={t.priority} autoFocus onChange={(e) => commitCell(t, 'priority', e.target.value)} onBlur={cancelEdit} onKeyDown={escKey}>
                 {PRIORITIES.map((p) => (
@@ -444,16 +546,14 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
                 ))}
               </select>
             ) : (
-              <span onDoubleClick={() => startEdit(t, 'priority')} title={editTitle}>
-                <Pill color={priorityColor(t.priority)}>{t.priority}</Pill>
-              </span>
+              <span className="task-lift"><Pill color={priorityColor(t.priority)}>{t.priority}</Pill></span>
             )}
           </td>
         );
       case 'assignee': {
         const assignee = peopleById.get(t.assignee_id);
         return (
-          <td key={col.key} onDoubleClick={(e) => e.stopPropagation()}>
+          <td key={col.key} {...editable('assignee')}>
             {isEditing(t, 'assignee') ? (
               <select className="input input-sm" defaultValue={t.assignee_id ?? ''} autoFocus onChange={(e) => commitCell(t, 'assignee', e.target.value)} onBlur={cancelEdit} onKeyDown={escKey}>
                 <option value="">Unassigned</option>
@@ -462,7 +562,7 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
                 ))}
               </select>
             ) : (
-              <span onDoubleClick={() => startEdit(t, 'assignee')} title={editTitle}>
+              <span className="task-lift">
                 {assignee ? (
                   <span className="task-assignee">
                     <Avatar person={assignee} size={22} />
@@ -473,6 +573,14 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
                 ) : (
                   <span className="cell-empty">Unassigned</span>
                 )}
+                {taskCollaborators(t).length > 0 && (
+                  <span
+                    className="task-collab-count"
+                    title={`Shared with ${taskCollaborators(t).map((id) => (id === me.id ? 'you' : peopleById.get(id)?.name || 'former member')).join(', ')}`}
+                  >
+                    +{taskCollaborators(t).length}
+                  </span>
+                )}
               </span>
             )}
           </td>
@@ -481,7 +589,7 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
       case 'due': {
         const overdue = isOverdue(t, board.statuses);
         return (
-          <td key={col.key} className={overdue ? 'task-overdue' : undefined} onDoubleClick={(e) => e.stopPropagation()}>
+          <td key={col.key} {...editable('due', undefined, overdue ? 'task-overdue' : undefined)}>
             {isEditing(t, 'due') ? (
               <input
                 type="date"
@@ -495,7 +603,7 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
                 }}
               />
             ) : (
-              <span onDoubleClick={() => startEdit(t, 'due')} title={editTitle}>
+              <span className="task-lift">
                 {t.due_date ? `${overdue ? '⚠ ' : ''}${formatDay(t.due_date)}` : <span className="cell-empty">—</span>}
               </span>
             )}
@@ -514,15 +622,22 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
       default: {
         const fk = col.custom.field_key;
         return (
-          <td key={col.key} onDoubleClick={(e) => e.stopPropagation()}>
+          <td key={col.key} {...editable(fk, t.data?.[fk])}>
             {isEditing(t, fk) ? (
-              <div className="task-draft-field" onBlur={() => commitCell(t, fk, editValue)} onKeyDown={escKey}>
+              <div
+                className="task-draft-field"
+                onBlur={(e) => {
+                  // Ignore focus moving within the editor (e.g. its Remove
+                  // button) and the window losing focus to a file dialog.
+                  if (e.currentTarget.contains(e.relatedTarget) || !document.hasFocus()) return;
+                  commitCell(t, fk, editValue);
+                }}
+                onKeyDown={escKey}
+              >
                 <ColumnInput column={col.custom} value={editValue} onChange={setEditValue} autoFocus />
               </div>
             ) : (
-              <span onDoubleClick={() => startEdit(t, fk, t.data?.[fk])} title={editTitle}>
-                <ColumnValue column={col.custom} value={t.data?.[fk]} />
-              </span>
+              <span className="task-lift"><ColumnValue column={col.custom} value={t.data?.[fk]} /></span>
             )}
           </td>
         );
@@ -689,11 +804,13 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
         <div className="table-toolbar">
           <span className="task-muted" style={{ fontSize: 12.5 }}>
             {shown.length === tasks.length ? `${tasks.length} task${tasks.length === 1 ? '' : 's'}` : `${shown.length} of ${tasks.length} tasks`}
+            {access.canEdit && tasks.length > 0 && ' · double-click a cell to edit'}
           </span>
           <div className="table-toolbar-actions">
             <select className="input input-sm" value={assigneeFilter} onChange={(e) => setAssigneeFilter(e.target.value)}>
               <option value="">Anyone</option>
               <option value="me">Assigned to me</option>
+              <option value="shared">Shared with me</option>
               <option value="none">Unassigned</option>
               {people.map((p) => (
                 <option key={p.id} value={String(p.id)}>{p.name}</option>
@@ -808,9 +925,9 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
                   </td>
                 </tr>
               )}
-              {sorted.map((t, i) => (
+              {pageTasks.map((t, i) => (
                 <tr key={t.id}>
-                  {board.show_serial && <td className="task-td-serial">{i + 1}</td>}
+                  {board.show_serial && <td className="task-td-serial">{(currentTaskPage - 1) * TASKS_PER_PAGE + i + 1}</td>}
                   {visibleCols.map((col) => renderCell(col, t))}
                   <td onDoubleClick={(e) => e.stopPropagation()}>
                     <div className="row-actions">
@@ -843,7 +960,17 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
             </tbody>
           </table>
         </div>
+        <Pager page={currentTaskPage} per={TASKS_PER_PAGE} total={sorted.length} onPage={setTaskPage} noun="tasks" />
       </div>
+
+      <BoardHistory
+        boardUuid={board.uuid}
+        people={people}
+        refreshKey={data}
+        onOpenFullLog={() => setHistory({ task: null })}
+        onReverted={reload}
+        taskActions={historyTaskActions}
+      />
         </>
       )}
 
@@ -877,6 +1004,7 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
           people={people}
           onClose={() => setHistory(null)}
           onReverted={reload}
+          taskActions={historyTaskActions}
         />
       )}
       {showSettings && (
@@ -904,6 +1032,54 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
           }}
         />
       )}
+      {commentPrompt && (() => {
+        const created = commentPrompt.kind === 'created';
+        const card = (
+          <div
+            className={`comment-prompt${created ? ' comment-prompt-centered' : ''}`}
+            role="dialog"
+            aria-label="Add a comment"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="comment-prompt-head">
+              <span className="comment-prompt-check">✓</span>
+              <div>
+                <strong>
+                  {created ? 'Created' : 'Saved'}
+                  {commentPrompt.title ? ` “${commentPrompt.title}”` : ''}
+                </strong>
+                <span>
+                  {created
+                    ? 'Add a comment for the team? Type @ to notify someone, or attach files.'
+                    : 'Add a comment about this change? Others will see it in the history.'}
+                </span>
+              </div>
+              <button type="button" className="new-track-close" onClick={() => setCommentPrompt(null)} title="Skip">×</button>
+            </div>
+            <CommentComposer
+              key={commentPrompt.activityId}
+              people={people}
+              autoFocus={commentPrompt.focus}
+              submitLabel="Post comment"
+              placeholder={created ? 'Context, next steps, who should pick it up… type @ to mention' : 'Why did this change? Type @ to notify someone…'}
+              onCancel={() => setCommentPrompt(null)}
+              cancelLabel="Skip"
+              onSubmit={async (text, files) => {
+                await api(`${base}/activity/${commentPrompt.activityId}/comments`, 'POST', { body: text, attachments: files });
+                setCommentPrompt(null);
+                reload();
+              }}
+            />
+          </div>
+        );
+        return created ? (
+          <div className="modal-overlay comment-prompt-overlay" onClick={() => setCommentPrompt(null)}>
+            {card}
+          </div>
+        ) : (
+          card
+        );
+      })()}
       {showColumnPicker && (
         <div className="modal-overlay" onClick={() => setShowColumnPicker(false)}>
           <div className="modal modal-sm" onClick={(e) => e.stopPropagation()}>

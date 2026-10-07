@@ -20,7 +20,8 @@ export const POST = withApiErrors(async (request) => {
   const name = typeof body.name === 'string' ? body.name.trim().slice(0, 255) : '';
   const description = typeof body.description === 'string' ? body.description.trim().slice(0, 500) : '';
   const visibility = body.visibility === 'public' ? 'public' : 'private';
-  const showSerial = body.show_serial ? 1 : 0;
+  // Sr. No. is on unless the creator unticked it.
+  const showSerial = body.show_serial === false ? 0 : 1;
   if (!name) return NextResponse.json({ error: 'Give the board a name.' }, { status: 400 });
 
   // `columns` present → the creator chose custom columns; otherwise the

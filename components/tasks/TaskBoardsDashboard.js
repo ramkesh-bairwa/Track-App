@@ -10,7 +10,7 @@ function NewBoardModal({ onClose }) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [visibility, setVisibility] = useState('private');
-  const [showSerial, setShowSerial] = useState(false);
+  const [showSerial, setShowSerial] = useState(true);
   const [columnMode, setColumnMode] = useState('default');
   const [customColumns, setCustomColumns] = useState([blankColumn()]);
   const [saving, setSaving] = useState(false);

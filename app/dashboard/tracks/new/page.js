@@ -64,6 +64,7 @@ function NewTrackForm() {
           color,
           parent_id: parentId || null,
           view_type: viewType,
+          show_serial: searchParams.get('serial') !== '0',
           columns: columns.map((c) => ({
             label: c.label,
             field_type: c.field_type,

@@ -31,6 +31,8 @@ export const POST = withApiErrors(async (request) => {
   const color = (body.color || '#35C2A6').trim().slice(0, 20);
   const columns = Array.isArray(body.columns) ? body.columns : [];
   const viewType = normalizeViewType(body.view_type);
+  // Sr. No. is on unless the creator unticked it.
+  const showSerial = body.show_serial === false ? 0 : 1;
 
   if (!name) {
     return NextResponse.json({ error: 'Track name is required.' }, { status: 400 });
@@ -63,11 +65,11 @@ export const POST = withApiErrors(async (request) => {
     let trackResult;
     try {
       [trackResult] = await conn.execute(
-        'INSERT INTO tracks (user_id, parent_id, uuid, name, description, icon, icon_type, color, view_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [user.id, parentId, trackUuid, name, description || null, icon, iconType, color, viewType]
+        'INSERT INTO tracks (user_id, parent_id, uuid, name, description, icon, icon_type, color, view_type, show_serial) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [user.id, parentId, trackUuid, name, description || null, icon, iconType, color, viewType, showSerial]
       );
     } catch (err) {
-      // Database not migrated yet (no view_type column) — still create the
+      // Database not migrated yet (no view_type / show_serial column) — still create the
       // track; it just shows in the default table layout until `npm run seed`.
       if (err.code !== 'ER_BAD_FIELD_ERROR') throw err;
       [trackResult] = await conn.execute(

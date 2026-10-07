@@ -59,7 +59,7 @@ export const POST = withApiErrors(async (request, { params }) => {
     );
     // A creation logs every filled-in field as "(empty) → value".
     const changes = diffTask({ data: {} }, task, columns, people);
-    await logActivity(conn, {
+    const activityId = await logActivity(conn, {
       boardId: board.id,
       taskId: res.insertId,
       user,
@@ -68,7 +68,7 @@ export const POST = withApiErrors(async (request, { params }) => {
       changes,
     });
     await conn.commit();
-    return NextResponse.json({ ok: true, id: res.insertId, uuid });
+    return NextResponse.json({ ok: true, id: res.insertId, uuid, activity_id: activityId });
   } catch (err) {
     await conn.rollback();
     throw err;

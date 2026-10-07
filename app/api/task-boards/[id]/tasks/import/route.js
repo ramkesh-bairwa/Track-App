@@ -82,6 +82,7 @@ export const POST = withApiErrors(async (request, { params }) => {
     });
   }
 
+  let activityId = null;
   const conn = await getPool().getConnection();
   try {
     await conn.beginTransaction();
@@ -124,7 +125,8 @@ export const POST = withApiErrors(async (request, { params }) => {
         changes: diffTask({ data: {} }, task, columns, people),
       });
     }
-    await logActivity(conn, {
+    // The import's own entry — the client offers to comment on it.
+    activityId = await logActivity(conn, {
       boardId: board.id,
       user,
       action: 'task_import',
@@ -137,5 +139,5 @@ export const POST = withApiErrors(async (request, { params }) => {
   } finally {
     conn.release();
   }
-  return NextResponse.json({ ok: true, count: tasks.length });
+  return NextResponse.json({ ok: true, count: tasks.length, activity_id: activityId });
 });

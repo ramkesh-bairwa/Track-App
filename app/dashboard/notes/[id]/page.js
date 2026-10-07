@@ -3,7 +3,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { query } from '@/lib/db';
 import NoteView from '@/components/NoteView';
 
-export default async function NotePage({ params, searchParams }) {
+export default async function NotePage({ params }) {
   const user = await getCurrentUser();
   const rows = await query('SELECT * FROM notes WHERE uuid = ? AND user_id = ?', [params.id, user.id]);
   const note = rows[0];
@@ -27,7 +27,5 @@ export default async function NotePage({ params, searchParams }) {
     [note.id]
   );
 
-  return (
-    <NoteView note={note} breadcrumbs={breadcrumbs} subnotes={subnotes} startEditing={searchParams?.edit === '1'} />
-  );
+  return <NoteView note={note} breadcrumbs={breadcrumbs} subnotes={subnotes} />;
 }

@@ -51,7 +51,17 @@ export default function TaskBoardSettings({ data, onClose, onChanged, onDeleted 
   const [colType, setColType] = useState('text');
   const [colOptions, setColOptions] = useState('');
   const [hiddenCols, setHiddenCols] = useState(() => new Set(board.hidden_columns || []));
+  const [showSerial, setShowSerial] = useState(board.show_serial);
   const listingCols = orderTaskColumns(board.column_order, columns);
+
+  function toggleSerial() {
+    const next = !showSerial;
+    setShowSerial(next);
+    run(() => api(base, 'PATCH', { show_serial: next }), 'Listing columns saved.', { rethrow: true }).catch((err) => {
+      setShowSerial(!next);
+      setError(err.message);
+    });
+  }
 
   // Saves straight away, like the other column edits here.
   function toggleListingColumn(key) {
@@ -403,6 +413,10 @@ export default function TaskBoardSettings({ data, onClose, onChanged, onDeleted 
               Ticked columns show in the task list for everyone on this board. Unticked ones stay on each task and in exports — they’re just not listed. Members can still hide more for themselves with “☰ Columns”.
             </p>
             <div className="export-columns">
+              <label className="export-column-option" title="Numbers every task 1, 2, 3… at the start of the list">
+                <input type="checkbox" checked={showSerial} disabled={busy} onChange={toggleSerial} />
+                <span>Sr. No.</span>
+              </label>
               {listingCols.map((col) => (
                 <label key={col.key} className="export-column-option" title={col.key === 'title' ? 'Title always shows' : undefined}>
                   <input

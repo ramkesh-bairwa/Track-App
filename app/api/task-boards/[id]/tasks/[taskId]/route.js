@@ -15,6 +15,7 @@ import {
   writeTask,
   logActivity,
 } from '@/lib/taskServer';
+import { taskCollaborators } from '@/lib/taskConfig';
 
 async function loadTask(params, user) {
   const access = await getBoardAccess(params.id, user);
@@ -42,9 +43,9 @@ export const PATCH = withApiErrors(async (request, { params }) => {
   const result = sanitizeTaskInput(body, { statuses: boardStatuses(board), columns, people, partial: true });
   if (result.error) return NextResponse.json({ error: result.error }, { status: 400 });
 
-  // Without edit rights, the assignee may still move their own task's status.
+  // Without edit rights, the assignee or a collaborator may still move the task's status.
   const onlyStatus = Object.keys(result.values).every((k) => k === 'status');
-  const allowed = access.canEdit || (onlyStatus && task.assignee_id === user.id);
+  const allowed = access.canEdit || (onlyStatus && (task.assignee_id === user.id || taskCollaborators(task).includes(user.id)));
   if (!allowed) {
     return NextResponse.json({ error: "You don't have permission to edit this task." }, { status: 403 });
   }
@@ -53,11 +54,12 @@ export const PATCH = withApiErrors(async (request, { params }) => {
   const changes = diffTask(task, next, columns, people);
   if (changes.length === 0) return NextResponse.json({ ok: true, unchanged: true });
 
+  let activityId = null;
   const conn = await getPool().getConnection();
   try {
     await conn.beginTransaction();
     await writeTask(conn, task.id, next, user.id);
-    await logActivity(conn, {
+    activityId = await logActivity(conn, {
       boardId: board.id,
       taskId: task.id,
       user,
@@ -75,7 +77,7 @@ export const PATCH = withApiErrors(async (request, { params }) => {
   } finally {
     conn.release();
   }
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, activity_id: activityId });
 });
 
 // Soft delete, so the admin can bring it back from the activity log.

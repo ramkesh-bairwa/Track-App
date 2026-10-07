@@ -12,8 +12,6 @@ export const KINDS = {
   task: { label: 'Tasks', icon: 'fa-solid fa-list-check' },
   code: { label: 'Code', icon: 'fa-solid fa-code' },
   calendar: { label: 'Calendar', icon: 'fa-solid fa-calendar-days' },
-  expense: { label: 'Expenses', icon: 'fa-solid fa-wallet' },
-  routine: { label: 'Routine', icon: 'fa-solid fa-sun' },
   download: { label: 'Downloads', icon: 'fa-solid fa-cloud-arrow-down' },
   photo: { label: 'Photos', icon: 'fa-solid fa-image' },
   pdf: { label: 'PDFs', icon: 'fa-solid fa-file-pdf' },
@@ -43,7 +41,10 @@ export default function ActivityList({ items, compact = false }) {
         const spans = item.hits > 1 && item.updated_at !== item.created_at;
         const body = (
           <>
-            <span className="act-summary">{item.summary}</span>
+            <span className="act-summary">
+              {item.actor && <strong className="act-actor">{item.actor}: </strong>}
+              {item.summary}
+            </span>
             {item.hits > 1 && <span className="act-hits" title={`${item.hits} times`}>×{item.hits}</span>}
           </>
         );

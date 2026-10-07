@@ -6,7 +6,8 @@ import NotesMenu from '@/components/NotesMenu';
 import TasksMenu from '@/components/TasksMenu';
 import TopbarTools from '@/components/TopbarTools';
 import MobileNav from '@/components/MobileNav';
-import { chromeColorStyle, contentColorCss } from '@/lib/color';
+import NotificationsBell from '@/components/NotificationsBell';
+import { chromeColorStyle } from '@/lib/color';
 import { menuShown } from '@/lib/menuItems';
 
 export default async function DashboardLayout({ children }) {
@@ -20,7 +21,6 @@ export default async function DashboardLayout({ children }) {
 
   return (
     <div className="app-shell">
-      {user?.content_color && <style>{contentColorCss(user.content_color)}</style>}
       <Sidebar user={user} tracks={tracks} />
       <MobileNav user={user} tracks={tracks} />
       <div className="content-area">
@@ -28,6 +28,7 @@ export default async function DashboardLayout({ children }) {
           <TopbarTools hidden={user?.hidden_menus} />
           {menuShown(user, 'tasks') && <TasksMenu />}
           {menuShown(user, 'notes') && <NotesMenu />}
+          {user && <NotificationsBell />}
           <ProfileMenu user={user} />
         </div>
         <main className="main">{children}</main>

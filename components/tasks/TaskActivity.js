@@ -1,45 +1,23 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Avatar, formatDateTime, timeAgo } from '@/components/tasks/taskUi';
 import ExportMenu from '@/components/ExportMenu';
+import ActivityEntry, { Pager, DayHeading, withDayHeadings } from '@/components/tasks/ActivityEntry';
+import { entryTaskProps } from '@/components/tasks/BoardHistory';
 import { ACTIVITY_COLUMNS, activityRows } from '@/lib/taskExport';
-
-const ACTION_LABELS = {
-  board_create: 'Board created',
-  board_update: 'Board settings',
-  column_add: 'Column added',
-  column_update: 'Column edited',
-  column_remove: 'Column removed',
-  member_add: 'Member added',
-  member_update: 'Permissions',
-  member_remove: 'Member removed',
-  task_create: 'Task created',
-  task_update: 'Task edited',
-  task_delete: 'Task deleted',
-  task_restore: 'Task restored',
-  task_import: 'Tasks imported',
-};
-
-const ACTION_TONE = {
-  task_create: 'good',
-  task_restore: 'good',
-  task_import: 'good',
-  task_delete: 'bad',
-  member_remove: 'bad',
-  column_remove: 'bad',
-};
 
 // The activity log — the whole board's, or one task's (`task` set). Everyone
 // on the board can read it; only the admin gets the Revert buttons.
-export default function TaskActivity({ boardUuid, task, people, onClose, onReverted }) {
+export default function TaskActivity({ boardUuid, task, people, onClose, onReverted, taskActions }) {
   const [activity, setActivity] = useState(null);
   const [canRevert, setCanRevert] = useState(false);
+  const [meId, setMeId] = useState(null);
+  const [hideViews, setHideViews] = useState(false);
+  const [page, setPage] = useState(1);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [userFilter, setUserFilter] = useState('');
-  const [busyId, setBusyId] = useState(null);
-  const [confirmId, setConfirmId] = useState(null);
+  const [onlyMine, setOnlyMine] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -48,6 +26,7 @@ export default function TaskActivity({ boardUuid, task, people, onClose, onRever
       if (!res.ok) throw new Error(json.error || 'Could not load the activity log.');
       setActivity(json.activity);
       setCanRevert(json.canRevert);
+      setMeId(json.me);
     } catch (err) {
       setError(err.message);
     }
@@ -66,19 +45,15 @@ export default function TaskActivity({ boardUuid, task, people, onClose, onRever
   }, [onClose]);
 
   async function revert(entry) {
-    setBusyId(entry.id);
     setError('');
     try {
       const res = await fetch(`/api/task-boards/${boardUuid}/activity/${entry.id}/revert`, { method: 'POST' });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || 'Could not revert that change.');
-      setConfirmId(null);
       await load();
       onReverted?.();
     } catch (err) {
       setError(err.message);
-    } finally {
-      setBusyId(null);
     }
   }
 
@@ -92,14 +67,24 @@ export default function TaskActivity({ boardUuid, task, people, onClose, onRever
     const q = search.trim().toLowerCase();
     return (activity || []).filter((a) => {
       if (userFilter && String(a.user_id) !== userFilter) return false;
+      if (onlyMine && !a.mine) return false;
+      if (hideViews && a.action === 'task_view') return false;
       if (!q) return true;
       return (
         a.summary.toLowerCase().includes(q) ||
         (a.task_title || '').toLowerCase().includes(q) ||
+        (a.note || '').toLowerCase().includes(q) ||
         a.changes.some((c) => `${c.label} ${c.oldText} ${c.newText}`.toLowerCase().includes(q))
       );
     });
-  }, [activity, search, userFilter]);
+  }, [activity, search, userFilter, onlyMine, hideViews]);
+
+  // Filters change the list, so start again from the first page.
+  useEffect(() => setPage(1), [search, userFilter, onlyMine, hideViews]);
+  const PER = 10;
+  const pageCount = Math.max(1, Math.ceil(shown.length / PER));
+  const current = Math.min(page, pageCount);
+  const pageItems = shown.slice((current - 1) * PER, current * PER);
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -108,7 +93,8 @@ export default function TaskActivity({ boardUuid, task, people, onClose, onRever
           <div>
             <h2>{task ? `History — ${task.title}` : 'Activity log'}</h2>
             <p className="new-track-steps">
-              Every change, who made it and what it was before.{canRevert ? ' As admin you can revert task changes.' : ''}
+              Every change and view, who made it and what it was before. Add a note to any entry — notes are logged too.
+              {canRevert ? ' As admin you can revert task changes.' : ''}
             </p>
           </div>
           <button type="button" className="new-track-close" onClick={onClose} title="Close">×</button>
@@ -128,6 +114,16 @@ export default function TaskActivity({ boardUuid, task, people, onClose, onRever
               <option key={id} value={String(id)}>{name}</option>
             ))}
           </select>
+          {!task && (
+            <label className="checkbox-row" title="Changes you made, plus anyone's changes to tasks assigned to, created by or shared with you">
+              <input type="checkbox" checked={onlyMine} onChange={(e) => setOnlyMine(e.target.checked)} />
+              <span style={{ fontSize: 13 }}>Only my tasks</span>
+            </label>
+          )}
+          <label className="checkbox-row" title="Leave out who-opened-which-task entries">
+            <input type="checkbox" checked={hideViews} onChange={(e) => setHideViews(e.target.checked)} />
+            <span style={{ fontSize: 13 }}>Hide views</span>
+          </label>
           <ExportMenu
             className="btn btn-sm"
             getTable={() => ({
@@ -147,69 +143,26 @@ export default function TaskActivity({ boardUuid, task, people, onClose, onRever
           ) : shown.length === 0 ? (
             <p className="task-muted">{activity.length === 0 ? 'No activity yet.' : 'Nothing matches.'}</p>
           ) : (
-            shown.map((a) => {
-              const person = people.find((p) => p.id === a.user_id) || { name: a.user_name };
-              return (
-                <div key={a.id} className={`task-log${a.reverted_at ? ' task-log-reverted' : ''}`}>
-                  <Avatar person={person} size={28} />
-                  <div className="task-log-body">
-                    <div className="task-log-head">
-                      <strong>{a.user_name}</strong>
-                      <span className={`task-log-badge ${ACTION_TONE[a.action] || ''}`}>{ACTION_LABELS[a.action] || a.action}</span>
-                      <span className="task-log-time" title={formatDateTime(a.created_at)}>
-                        #{a.id} · {timeAgo(a.created_at)}
-                      </span>
-                    </div>
-                    <div className="task-log-summary">
-                      {a.summary}
-                      {!task && a.task_title && a.summary.indexOf(a.task_title) === -1 && (
-                        <span className="task-muted"> — {a.task_title}</span>
-                      )}
-                    </div>
-                    {a.changes.length > 0 && (
-                      <table className="task-log-changes">
-                        <thead>
-                          <tr><th>Field</th><th>Old</th><th /><th>New</th></tr>
-                        </thead>
-                        <tbody>
-                          {a.changes.map((c) => (
-                            <tr key={c.key}>
-                              <td className="task-log-field">{c.label}</td>
-                              <td className="task-log-old">{c.oldText || <em>empty</em>}</td>
-                              <td className="task-log-arrow">→</td>
-                              <td className="task-log-new">{c.newText || <em>empty</em>}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
-                    {a.reverted_at && (
-                      <div className="task-log-reverted-note">
-                        ↺ Reverted by {a.reverted_by_name || 'admin'} · {formatDateTime(a.reverted_at)}
-                      </div>
-                    )}
-                    {a.revert_of && <div className="task-log-reverted-note">↺ This undid change #{a.revert_of}</div>}
-                    {canRevert && a.revertible && (
-                      <div className="task-log-actions">
-                        {confirmId === a.id ? (
-                          <>
-                            <span className="task-muted">Undo this change?</span>
-                            <button type="button" className="btn btn-sm btn-danger" disabled={busyId === a.id} onClick={() => revert(a)}>
-                              {busyId === a.id ? 'Reverting…' : 'Yes, revert'}
-                            </button>
-                            <button type="button" className="btn btn-sm btn-ghost" onClick={() => setConfirmId(null)}>Cancel</button>
-                          </>
-                        ) : (
-                          <button type="button" className="btn btn-sm" onClick={() => setConfirmId(a.id)}>↺ Revert</button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })
+            withDayHeadings(pageItems).map(({ heading, entry: a, key }) => heading ? (
+              <DayHeading key={key}>{heading}</DayHeading>
+            ) : (
+              <ActivityEntry
+                key={key}
+                entry={a}
+                people={people}
+                boardUuid={boardUuid}
+                meId={meId}
+                isAdmin={canRevert}
+                showTask={!task}
+                canRevert={canRevert}
+                onRevert={revert}
+                onChanged={load}
+                {...entryTaskProps(taskActions, a)}
+              />
+            ))
           )}
         </div>
+        <Pager page={current} per={PER} total={shown.length} onPage={setPage} noun="entries" />
       </div>
     </div>
   );
