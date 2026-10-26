@@ -68,7 +68,7 @@ export function NewCodeFileModal({ onClose }) {
 
 // Add user · Users · Photo editor · Code — in the desktop topbar, and as a
 // list in the sidebar (the topbar is hidden on phones).
-export default function TopbarTools({ variant = 'topbar', hidden = [] }) {
+export default function TopbarTools({ variant = 'topbar', hidden = [], isAdmin = false }) {
   const router = useRouter();
   const pathname = usePathname() || '';
   const [addUser, setAddUser] = useState(false);
@@ -113,6 +113,12 @@ export default function TopbarTools({ variant = 'topbar', hidden = [] }) {
         <Link href="/dashboard/security-test" className={`${cls}${active('/dashboard/security-test')}`} title="Run a security self-scan of this site">
           <i className="fa-solid fa-shield-halved" />
           <span>Test site</span>
+        </Link>
+      )}
+      {isAdmin && shows('console') && (
+        <Link href="/dashboard/console" className={`${cls}${active('/dashboard/console')}`} title="Admin server console">
+          <i className="fa-solid fa-terminal" />
+          <span>Server console</span>
         </Link>
       )}
       {addUser && (

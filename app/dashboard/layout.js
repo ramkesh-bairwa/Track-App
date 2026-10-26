@@ -26,7 +26,7 @@ export default async function DashboardLayout({ children }) {
       <MobileNav user={user} tracks={tracks} />
       <div className="content-area">
         <div className="topbar" style={chromeColorStyle(user?.topbar_color)}>
-          <TopbarTools hidden={user?.hidden_menus} />
+          <TopbarTools hidden={user?.hidden_menus} isAdmin={user?.is_admin} />
           {menuShown(user, 'tasks') && <TasksMenu />}
           {menuShown(user, 'notes') && <NotesMenu />}
           {user && <NotificationsBell />}

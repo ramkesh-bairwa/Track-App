@@ -459,7 +459,7 @@ export default function Sidebar({ user, tracks }) {
         </>
       )}
       <div className="sidebar-tools">
-        <TopbarTools variant="sidebar" hidden={user?.hidden_menus} />
+        <TopbarTools variant="sidebar" hidden={user?.hidden_menus} isAdmin={user?.is_admin} />
       </div>
 
       {menuShown(user, 'records') && (
