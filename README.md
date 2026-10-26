@@ -73,9 +73,9 @@ port 3006) behind Nginx + HTTPS at https://my-track.glamofashion.com.
 copy the result over SSH:
 
 ```bash
-./deploy.sh              # build locally → rsync → pm2 restart (+ health check)
-./deploy.sh --no-build   # deploy the existing .next without rebuilding
-./deploy.sh --restart    # just restart the app on the server
+./deploy/deploy.sh              # build locally → rsync → pm2 restart (+ health check)
+./deploy/deploy.sh --no-build   # deploy the existing .next without rebuilding
+./deploy/deploy.sh --restart    # just restart the app on the server
 ```
 
 The script needs the SSH key `~/.ssh/id_ed25519_mytrack_vps`. It never copies

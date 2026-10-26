@@ -4,9 +4,9 @@
 # is too slow to run `next build`), copies the result over SSH with rsync, then
 # restarts the app under PM2.
 #
-#   ./deploy.sh              # build + deploy
-#   ./deploy.sh --no-build   # deploy the existing .next (skip rebuild)
-#   ./deploy.sh --restart    # just restart the app on the server
+#   ./deploy/deploy.sh              # build + deploy
+#   ./deploy/deploy.sh --no-build   # deploy the existing .next (skip rebuild)
+#   ./deploy/deploy.sh --restart    # just restart the app on the server
 #
 set -euo pipefail
 
@@ -18,7 +18,8 @@ PM2_NAME="track-app"
 PORT="3006"
 SSH_OPTS="-i $SSH_KEY -o IdentitiesOnly=yes"
 
-cd "$(dirname "$0")"
+# Run from the project root (this script lives in deploy/).
+cd "$(dirname "$0")/.."
 SSH="ssh $SSH_OPTS $SERVER"
 
 run_restart_only=false
