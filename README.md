@@ -64,42 +64,25 @@ to register the first account.
   single self-hosted user base (no email verification, no password reset
   — add those if you expose this beyond yourself).
 
-## Deploy (Docker + Jenkins)
+## Deploy
 
-Files: `Dockerfile`, `docker-compose.yml`, `Jenkinsfile`, `deploy/remote-deploy.sh`.
+No Docker. The app runs natively on the VPS under PM2 (process `track-app`,
+port 3006) behind Nginx + HTTPS at https://my-track.glamofashion.com.
 
-The Jenkins job builds the image, smoke-tests it, streams it to the server
-over SSH (`docker save | ssh docker load`, no registry needed) and starts it
-with docker compose. If the new version doesn't pass its health check, the
-previous one is started again and the build fails.
-
-**Server (once)**
-
-1. Install Docker with the compose plugin; create the deploy user and add it
-   to the `docker` group.
-2. MySQL/MariaDB on the server must accept connections from Docker: set
-   `bind-address = 0.0.0.0` (or the docker bridge IP) and allow the DB user
-   from `172.%`. In `.env` use `DB_HOST=host.docker.internal`.
-3. Put Nginx/Caddy with HTTPS in front of `127.0.0.1:3000`.
-
-**Jenkins (once)**
-
-- Plugins: Pipeline, Git, Credentials Binding, SSH Agent. The agent needs Docker.
-- Credentials: `mytrack-deploy-ssh` (SSH key for the server) and
-  `mytrack-env` (secret file: your production `.env`, see `.env.example`).
-- New Pipeline job → "Pipeline script from SCM" → this repo. Fill in
-  `DEPLOY_HOST` / `DEPLOY_USER` / `DEPLOY_DIR` on the first run.
-
-**Database schema**: tick `RUN_MIGRATIONS` to apply `scripts/schema.sql` before
-starting. It's safe to re-run, but uses MariaDB syntax (`ADD COLUMN IF NOT
-EXISTS`) and fails on MySQL.
-
-**Manually** (no Jenkins):
+`next build` is too slow on the 1-CPU server, so we **build on the Mac** and
+copy the result over SSH:
 
 ```bash
-docker build -t mytrack:latest .
-docker compose up -d                                    # uses .env next to it
-docker compose run --rm mytrack node scripts/migrate.js # schema, if needed
+./deploy.sh              # build locally → rsync → pm2 restart (+ health check)
+./deploy.sh --no-build   # deploy the existing .next without rebuilding
+./deploy.sh --restart    # just restart the app on the server
 ```
 
-Downloads and tracker screenshots are kept in the `mytrack-data` volume.
+The script needs the SSH key `~/.ssh/id_ed25519_mytrack_vps`. It never copies
+`.env`, `node_modules/` or `.next/cache/`; dependencies are installed on the
+server with `npm ci` only when `package-lock.json` changed, and the pdf.js /
+tesseract assets are re-copied there (the server's npm skips postinstall).
+
+Server first-time setup (once): clone into `/var/www/Track-App`, create `.env`
+(DB on 127.0.0.1), `npm ci`, `node scripts/migrate.js`, start with
+`pm2 start npm --name track-app -- start -- -p 3006`, and point Nginx at it.
