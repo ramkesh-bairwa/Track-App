@@ -1,12 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { rememberLoginPhotos } from '@/lib/captureSelfie';
 
 export default function PrivacyModal({ onClose }) {
   const [loaded, setLoaded] = useState(false);
   const [hasPassword, setHasPassword] = useState(false);
   const [requireDelete, setRequireDelete] = useState(false);
   const [requireEdit, setRequireEdit] = useState(false);
+  const [photosOn, setPhotosOn] = useState(true);
+  const [photosBusy, setPhotosBusy] = useState(false);
 
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -28,10 +31,41 @@ export default function PrivacyModal({ onClose }) {
         setLoaded(true);
       })
       .catch(() => setLoaded(true));
+    fetch('/api/auth/login-history/settings')
+      .then((res) => res.json())
+      .then((json) => {
+        if (cancelled) return;
+        setPhotosOn(json.enabled !== false);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
   }, []);
+
+  async function togglePhotos(enabled) {
+    setError('');
+    setNotice('');
+    setPhotosBusy(true);
+    const previous = photosOn;
+    setPhotosOn(enabled); // optimistic
+    try {
+      const res = await fetch('/api/auth/login-history/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || 'Could not change it.');
+      setPhotosOn(json.enabled);
+      rememberLoginPhotos(json.enabled);
+    } catch (err) {
+      setPhotosOn(previous); // roll back
+      setError(err.message);
+    } finally {
+      setPhotosBusy(false);
+    }
+  }
 
   async function patchPrivacy(body) {
     const res = await fetch('/api/auth/privacy', {
@@ -179,6 +213,22 @@ export default function PrivacyModal({ onClose }) {
             {!hasPassword && (
               <p className="field-hint">Set a privacy password above to turn these on.</p>
             )}
+
+            <p className="modal-section-title">Security camera</p>
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                checked={photosOn}
+                disabled={photosBusy}
+                onChange={(e) => togglePhotos(e.target.checked)}
+              />
+              <span>Take a camera photo when I sign in, and when MyTrack is opened or unlocked</span>
+            </label>
+            <p className="field-hint">
+              {photosOn
+                ? 'Photos are added to your Login history. Turn this off to never use the camera — sign-ins and openings are still recorded, just without a photo.'
+                : 'The camera is not used. Sign-ins, openings and unlocks are still recorded in Login history, without a photo.'}
+            </p>
           </>
         )}
 
