@@ -51,7 +51,9 @@ fi
 # Source, config and the fresh build. node_modules, secrets and local-only
 # data are never sent; .next/cache is huge and not needed at runtime.
 echo "▸ Syncing files to $SERVER:$APP_DIR …"
-rsync -az --delete --info=progress2 -e "ssh $SSH_OPTS" \
+# macOS ships openrsync (2.6.9-compatible), which lacks --info=progress2.
+if rsync --info=progress2 --version >/dev/null 2>&1; then PROGRESS='--info=progress2'; else PROGRESS='--stats'; fi
+rsync -az --delete $PROGRESS -e "ssh $SSH_OPTS" \
   --exclude 'node_modules/' \
   --exclude '.git/' \
   --exclude '.env' \
