@@ -61,6 +61,10 @@ rsync -az --delete $PROGRESS -e "ssh $SSH_OPTS" \
   --exclude 'downloads/' \
   --exclude 'public/system-tracker/' \
   --exclude '.next/cache/' \
+  --exclude '.next-desktop/' \
+  --exclude 'desktop/dist/' \
+  --exclude 'desktop/build/' \
+  --exclude 'desktop/vendor/' \
   --exclude '.DS_Store' \
   ./ "$SERVER:$APP_DIR/"
 
