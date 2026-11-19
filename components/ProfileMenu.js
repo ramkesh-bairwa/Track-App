@@ -9,8 +9,11 @@ import AppearanceModal from '@/components/AppearanceModal';
 import BackupModal from '@/components/BackupModal';
 import AccessibilityModal from '@/components/AccessibilityModal';
 import DataTransferModal from '@/components/DataTransferModal';
+import AppLockModal from '@/components/AppLockModal';
+import SyncModal from '@/components/SyncModal';
+import ServerConnectionModal from '@/components/ServerConnectionModal';
 
-export default function ProfileMenu({ user }) {
+export default function ProfileMenu({ user, desktop = false }) {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState(user);
   const [open, setOpen] = useState(false);
@@ -20,6 +23,9 @@ export default function ProfileMenu({ user }) {
   const [showBackup, setShowBackup] = useState(false);
   const [showAccessibility, setShowAccessibility] = useState(false);
   const [showData, setShowData] = useState(false);
+  const [showAppLock, setShowAppLock] = useState(false);
+  const [showSync, setShowSync] = useState(false);
+  const [showServer, setShowServer] = useState(false);
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -113,11 +119,45 @@ export default function ProfileMenu({ user }) {
             className="profile-menu-item"
             onClick={() => {
               setOpen(false);
+              setShowAppLock(true);
+            }}
+          >
+            App lock
+          </button>
+          <button
+            type="button"
+            className="profile-menu-item"
+            onClick={() => {
+              setOpen(false);
               setShowData(true);
             }}
           >
             Export / import data
           </button>
+          {desktop && (
+            <button
+              type="button"
+              className="profile-menu-item"
+              onClick={() => {
+                setOpen(false);
+                setShowServer(true);
+              }}
+            >
+              Server connection
+            </button>
+          )}
+          {currentUser?.is_admin && (
+            <button
+              type="button"
+              className="profile-menu-item"
+              onClick={() => {
+                setOpen(false);
+                setShowSync(true);
+              }}
+            >
+              Sync (web ⇄ desktop)
+            </button>
+          )}
           <button
             type="button"
             className="profile-menu-item"
@@ -139,7 +179,7 @@ export default function ProfileMenu({ user }) {
       )}
 
       {/* Rendered at the page root, so the top bar's own color settings don't leak into them. */}
-      {(showProfile || showPrivacy || showAccessibility || showBackup || showAppearance || showData) &&
+      {(showProfile || showPrivacy || showAccessibility || showBackup || showAppearance || showData || showAppLock || showSync || showServer) &&
         createPortal(
           <>
             {showProfile && (
@@ -165,6 +205,9 @@ export default function ProfileMenu({ user }) {
             )}
             {showBackup && <BackupModal user={currentUser} onClose={() => setShowBackup(false)} />}
             {showData && <DataTransferModal onClose={() => setShowData(false)} />}
+            {showAppLock && <AppLockModal onClose={() => setShowAppLock(false)} />}
+            {showSync && <SyncModal onClose={() => setShowSync(false)} />}
+            {showServer && <ServerConnectionModal user={currentUser} onClose={() => setShowServer(false)} />}
             {showAppearance && (
               <AppearanceModal
                 user={currentUser}
