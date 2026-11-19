@@ -34,6 +34,9 @@ export default function TracksDashboard({ tracks }) {
           <p>Every track you keep, and what you've logged in it.</p>
         </div>
         <div className="page-head-actions">
+          <a className="btn" href="/download" title="Download MyTrack for Mac, Windows, Android or iPhone">
+            📱 Get the app
+          </a>
           <button
             className="btn"
             onClick={() => document.getElementById('track-history')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}

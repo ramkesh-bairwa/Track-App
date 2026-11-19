@@ -89,7 +89,7 @@ export default function DownloadPage() {
       </section>
 
       <footer className="dl-foot">
-        <Link href="/login">← Back to sign in</Link>
+        <Link href="/">← Back to MyTrack</Link>
       </footer>
 
       <style
