@@ -1,0 +1,48 @@
+/* Admin → Users → Manage (components/users/UserAdmin.js) */
+.ua-page { display: flex; flex-direction: column; gap: 14px; }
+.ua-person { display: flex; gap: 14px; align-items: center; }
+.ua-person h1 { display: flex; align-items: center; gap: 8px; margin: 0; }
+.ua-muted { color: var(--text-muted); font-size: 12.5px; }
+.ua-hint { margin: 6px 0 0; }
+.ua-tiles { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+.ua-tile { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-elevated, var(--bg)); }
+.ua-tile strong { font-size: 22px; }
+.ua-tile span { font-size: 12px; color: var(--text-muted); }
+.ua-section { padding: 16px 18px; }
+.ua-section h2 { font-size: 15px; margin: 0 0 10px; }
+.ua-section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.ua-section-head h2 { margin: 0; }
+.ua-section-head .input { width: auto; }
+.ua-devices { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.ua-device { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-md); }
+.ua-device.revoked { opacity: 0.7; }
+.ua-device-head { display: flex; gap: 10px; align-items: flex-start; }
+.ua-device-head > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ua-dot { width: 10px; height: 10px; margin-top: 5px; border-radius: 50%; background: var(--text-muted); flex: none; }
+.ua-dot.on { background: #22c55e; box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2); }
+.ua-status.ok { color: #22c55e; }
+.ua-status.error, .ua-status.no-permission { color: var(--danger); }
+.ua-badge { align-self: flex-start; font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--accent-dim); }
+.ua-badge.danger { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
+.ua-controls, .ua-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.ua-actions { gap: 6px; }
+.ua-inline { display: inline-flex; align-items: center; gap: 6px; }
+.ua-inline .input { width: auto; }
+.ua-shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.ua-shot { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-muted); text-decoration: none; }
+.ua-shot img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); background: #000; }
+.ua-two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.ua-events { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 420px; overflow: auto; }
+.ua-events li { display: flex; gap: 10px; align-items: center; }
+.ua-events li > span:last-child { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.ua-events img, .ua-nophoto { width: 64px; height: 48px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); flex: none; }
+.ua-nophoto { display: grid; place-items: center; font-size: 10px; color: var(--text-muted); }
+.user-admin-actions { display: inline-flex; gap: 6px; }
+@media (max-width: 900px) {
+  .ua-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .ua-two { grid-template-columns: 1fr; }
+}
+
+/* "Open as this user" banner */
+.imp-banner { position: sticky; top: 0; z-index: 50; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; padding: 8px 14px; background: #b45309; color: #fff; font-size: 13.5px; }
+.imp-banner .btn { background: #fff; color: #7c2d12; border-color: #fff; }
