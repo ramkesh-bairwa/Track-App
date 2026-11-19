@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Header from '../Header';
-import { colors } from '../theme';
+import { colors, radius } from '../theme';
 import { Card, Empty, ErrorView, Loading } from '../ui';
 import { api } from '../api';
 
@@ -12,31 +13,24 @@ export default function TracksScreen({ nav, canGoBack }) {
   const load = useCallback(async () => {
     try {
       const data = await api.get('/api/tracks');
-      setState({ loading: false, error: '', tracks: data.tracks || [] });
+      setState({ loading: false, error: '', tracks: (data.tracks || []).filter((t) => t.parent_id == null) });
     } catch (e) {
       setState({ loading: false, error: e.message, tracks: [] });
     }
   }, []);
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
+  const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
 
   return (
-    <View style={{ flex: 1 }}>
-      <Header title="Tracks" canGoBack={canGoBack} onBack={nav.goBack} />
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <Header title="Tracks" subtitle={state.tracks.length ? `${state.tracks.length} trackers` : undefined} canGoBack={canGoBack} onBack={nav.goBack} />
       {state.loading ? (
         <Loading label="Loading tracks…" />
       ) : state.error ? (
         <ErrorView message={state.error} onRetry={load} />
       ) : state.tracks.length === 0 ? (
-        <Empty message="No tracks yet." />
+        <Empty icon="albums-outline" title="No tracks yet" subtitle="Create a tracker on the web and it'll show up here." />
       ) : (
         <FlatList
           data={state.tracks}
@@ -46,12 +40,16 @@ export default function TracksScreen({ nav, canGoBack }) {
           renderItem={({ item }) => (
             <Card onPress={() => nav.navigate('TrackDetail', { id: item.id, name: item.name })}>
               <View style={s.row}>
-                <View style={[s.dot, { backgroundColor: item.color || colors.primary }]} />
-                <View style={{ flex: 1 }}>
-                  <Text style={s.name}>{item.name}</Text>
-                  {item.description ? <Text style={s.desc} numberOfLines={1}>{item.description}</Text> : null}
+                <View style={[s.accent, { backgroundColor: item.color || colors.primary }]}>
+                  <Ionicons name="pricetag" size={18} color="#fff" />
                 </View>
-                <Text style={s.chev}>›</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.name} numberOfLines={1}>{item.name}</Text>
+                  <Text style={s.meta} numberOfLines={1}>
+                    {item.description ? item.description : `${item.entry_count ?? 0} record${(item.entry_count ?? 0) === 1 ? '' : 's'}`}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.muted} />
               </View>
             </Card>
           )}
@@ -62,9 +60,8 @@ export default function TracksScreen({ nav, canGoBack }) {
 }
 
 const s = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  dot: { width: 14, height: 14, borderRadius: 7 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  accent: { width: 44, height: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   name: { color: colors.text, fontSize: 16, fontWeight: '700' },
-  desc: { color: colors.muted, fontSize: 13, marginTop: 2 },
-  chev: { color: colors.muted, fontSize: 24 },
+  meta: { color: colors.muted, fontSize: 13, marginTop: 2 },
 });

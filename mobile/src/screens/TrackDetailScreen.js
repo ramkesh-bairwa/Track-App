@@ -26,62 +26,49 @@ export default function TrackDetailScreen({ params, nav, canGoBack }) {
     }
   }, [id]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
+  const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  }, [load]);
-
-  const labelCols = state.columns.slice(0, 4);
+  const labelCols = state.columns.slice(0, 5);
 
   return (
-    <View style={{ flex: 1 }}>
-      <Header title={name || 'Track'} canGoBack={canGoBack} onBack={nav.goBack} />
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <Header title={name || 'Track'} subtitle={state.entries.length ? `${state.entries.length} records` : undefined} canGoBack={canGoBack} onBack={nav.goBack} />
       {state.loading ? (
         <Loading label="Loading records…" />
       ) : state.error ? (
         <ErrorView message={state.error} onRetry={load} />
       ) : state.entries.length === 0 ? (
-        <Empty message="No records in this track yet." />
+        <Empty icon="file-tray-outline" title="No records yet" subtitle="Records you add on the web appear here." />
       ) : (
         <FlatList
           data={state.entries}
           keyExtractor={(e) => String(e.id)}
           contentContainerStyle={{ padding: 16, gap: 12 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-          ListHeaderComponent={<Text style={s.count}>{state.entries.length} record{state.entries.length === 1 ? '' : 's'}</Text>}
-          renderItem={({ item }) => (
-            <Card>
-              {labelCols.length > 0 ? (
-                labelCols.map((col) => (
-                  <View key={col.id || col.field_key} style={s.field}>
-                    <Text style={s.fieldLabel}>{col.name || col.field_key}</Text>
-                    <Text style={s.fieldValue}>{formatVal(item.data?.[col.field_key])}</Text>
+          renderItem={({ item, index }) => {
+            const pairs = labelCols.length
+              ? labelCols.map((c) => [c.name || c.field_key, item.data?.[c.field_key]])
+              : Object.entries(item.data || {}).slice(0, 5);
+            return (
+              <Card>
+                <Text style={s.recNo}>#{state.entries.length - index}</Text>
+                {pairs.map(([k, v], i) => (
+                  <View key={i} style={[s.field, i === pairs.length - 1 && { marginBottom: 0 }]}>
+                    <Text style={s.label}>{k}</Text>
+                    <Text style={s.value}>{formatVal(v)}</Text>
                   </View>
-                ))
-              ) : (
-                Object.entries(item.data || {}).slice(0, 4).map(([k, v]) => (
-                  <View key={k} style={s.field}>
-                    <Text style={s.fieldLabel}>{k}</Text>
-                    <Text style={s.fieldValue}>{formatVal(v)}</Text>
-                  </View>
-                ))
-              )}
-            </Card>
-          )}
+                ))}
+              </Card>
+            );
+          }}
         />
       )}
     </View>
   );
 }
 
-function safeParse(s) {
-  try { return JSON.parse(s); } catch { return {}; }
-}
+function safeParse(s) { try { return JSON.parse(s); } catch { return {}; } }
 function formatVal(v) {
   if (v === null || v === undefined || v === '') return '—';
   if (typeof v === 'object') return JSON.stringify(v);
@@ -89,8 +76,8 @@ function formatVal(v) {
 }
 
 const s = StyleSheet.create({
-  count: { color: colors.muted, fontSize: 13, marginBottom: 2 },
-  field: { marginBottom: 8 },
-  fieldLabel: { color: colors.muted, fontSize: 12 },
-  fieldValue: { color: colors.text, fontSize: 15, marginTop: 1 },
+  recNo: { color: colors.muted, fontSize: 12, fontWeight: '700', marginBottom: 10 },
+  field: { marginBottom: 10 },
+  label: { color: colors.muted, fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.3 },
+  value: { color: colors.text, fontSize: 15, marginTop: 2 },
 });

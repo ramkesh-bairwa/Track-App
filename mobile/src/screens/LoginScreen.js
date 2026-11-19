@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { colors } from '../theme';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import { colors, gradients, radius, shadow } from '../theme';
 import { Button } from '../ui';
 import { login, fetchMe, setApiToken } from '../api';
 import { API_BASE } from '../config';
@@ -8,8 +10,10 @@ import { API_BASE } from '../config';
 export default function LoginScreen({ onSignedIn }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [focus, setFocus] = useState('');
 
   async function submit() {
     if (!email.trim() || !password) {
@@ -24,8 +28,7 @@ export default function LoginScreen({ onSignedIn }) {
       setApiToken(res.token);
       let user = null;
       try {
-        const me = await fetchMe(res.token);
-        user = me.user;
+        user = (await fetchMe(res.token)).user;
       } catch {}
       await onSignedIn(res.token, user);
     } catch (e) {
@@ -35,61 +38,97 @@ export default function LoginScreen({ onSignedIn }) {
     }
   }
 
+  const inputWrap = (name) => [s.inputWrap, focus === name && s.inputWrapFocus];
+
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={s.wrap} keyboardShouldPersistTaps="handled">
-        <Text style={s.logo}>MyTrack</Text>
-        <Text style={s.sub}>Sign in to your account</Text>
+    <LinearGradient colors={gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ flex: 1 }}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <View style={s.hero}>
+            <View style={s.logoMark}>
+              <Ionicons name="pulse" size={34} color="#fff" />
+            </View>
+            <Text style={s.brand}>MyTrack</Text>
+            <Text style={s.tagline}>Track everything, in one place.</Text>
+          </View>
 
-        <View style={s.form}>
-          <Text style={s.label}>Email</Text>
-          <TextInput
-            style={s.input}
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            autoCorrect={false}
-            placeholder="you@example.com"
-            placeholderTextColor={colors.muted}
-          />
-          <Text style={s.label}>Password</Text>
-          <TextInput
-            style={s.input}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            placeholder="••••••••"
-            placeholderTextColor={colors.muted}
-            onSubmitEditing={submit}
-          />
-          {error ? <Text style={s.error}>{error}</Text> : null}
-          <View style={{ height: 8 }} />
-          <Button title={busy ? 'Signing in…' : 'Sign in'} onPress={submit} disabled={busy} />
-        </View>
+          <View style={[s.card, shadow(3)]}>
+            <Text style={s.cardTitle}>Welcome back</Text>
+            <Text style={s.cardSub}>Sign in to continue</Text>
 
-        <Text style={s.server}>Server: {API_BASE.replace(/^https?:\/\//, '')}</Text>
-      </ScrollView>
-    </KeyboardAvoidingView>
+            <View style={inputWrap('email')}>
+              <Ionicons name="mail-outline" size={20} color={colors.muted} />
+              <TextInput
+                style={s.input}
+                value={email}
+                onChangeText={setEmail}
+                onFocus={() => setFocus('email')}
+                onBlur={() => setFocus('')}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                autoCorrect={false}
+                placeholder="Email address"
+                placeholderTextColor={colors.muted}
+              />
+            </View>
+
+            <View style={inputWrap('password')}>
+              <Ionicons name="lock-closed-outline" size={20} color={colors.muted} />
+              <TextInput
+                style={s.input}
+                value={password}
+                onChangeText={setPassword}
+                onFocus={() => setFocus('password')}
+                onBlur={() => setFocus('')}
+                secureTextEntry={!show}
+                placeholder="Password"
+                placeholderTextColor={colors.muted}
+                onSubmitEditing={submit}
+              />
+              <Pressable onPress={() => setShow((v) => !v)} hitSlop={10}>
+                <Ionicons name={show ? 'eye-off-outline' : 'eye-outline'} size={20} color={colors.muted} />
+              </Pressable>
+            </View>
+
+            {error ? (
+              <View style={s.errorBox}>
+                <Ionicons name="alert-circle" size={16} color={colors.danger} />
+                <Text style={s.errorText}>{error}</Text>
+              </View>
+            ) : null}
+
+            <View style={{ height: 6 }} />
+            <Button title={busy ? 'Signing in…' : 'Sign in'} icon={busy ? undefined : 'arrow-forward'} onPress={submit} loading={busy} />
+          </View>
+
+          <Text style={s.server}>
+            <Ionicons name="shield-checkmark-outline" size={12} color="rgba(255,255,255,0.8)" /> {API_BASE.replace(/^https?:\/\//, '')}
+          </Text>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </LinearGradient>
   );
 }
 
 const s = StyleSheet.create({
-  wrap: { flexGrow: 1, justifyContent: 'center', padding: 24, gap: 6 },
-  logo: { color: colors.primary, fontSize: 40, fontWeight: '800', textAlign: 'center' },
-  sub: { color: colors.muted, fontSize: 16, textAlign: 'center', marginBottom: 24 },
-  form: { gap: 8 },
-  label: { color: colors.muted, fontSize: 13, marginTop: 8 },
-  input: {
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    color: colors.text,
-    fontSize: 16,
+  scroll: { flexGrow: 1, justifyContent: 'center', padding: 24, paddingVertical: 48 },
+  hero: { alignItems: 'center', marginBottom: 28 },
+  logoMark: {
+    width: 76, height: 76, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
   },
-  error: { color: colors.danger, marginTop: 10 },
-  server: { color: colors.muted, fontSize: 12, textAlign: 'center', marginTop: 28 },
+  brand: { color: '#fff', fontSize: 34, fontWeight: '800', marginTop: 16, letterSpacing: 0.3 },
+  tagline: { color: 'rgba(255,255,255,0.85)', fontSize: 15, marginTop: 4 },
+  card: { backgroundColor: colors.surface, borderRadius: radius.xl, padding: 24 },
+  cardTitle: { color: colors.text, fontSize: 24, fontWeight: '800' },
+  cardSub: { color: colors.muted, fontSize: 15, marginTop: 2, marginBottom: 20 },
+  inputWrap: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.border, paddingHorizontal: 14, marginBottom: 14,
+  },
+  inputWrapFocus: { borderColor: colors.primary, backgroundColor: '#fff' },
+  input: { flex: 1, paddingVertical: 15, color: colors.text, fontSize: 16 },
+  errorBox: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FDEBEF', padding: 10, borderRadius: radius.sm, marginTop: 2 },
+  errorText: { color: colors.danger, fontSize: 14, flex: 1 },
+  server: { color: 'rgba(255,255,255,0.8)', fontSize: 12, textAlign: 'center', marginTop: 24 },
 });

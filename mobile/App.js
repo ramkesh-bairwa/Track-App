@@ -72,7 +72,7 @@ export default function App() {
   if (booting) {
     return (
       <SafeAreaView style={s.root}>
-        <StatusBar barStyle="light-content" />
+        <StatusBar barStyle="dark-content" />
         <Loading label="MyTrack" />
       </SafeAreaView>
     );
@@ -80,7 +80,7 @@ export default function App() {
 
   return (
     <SafeAreaView style={s.root}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="dark-content" />
       <View style={s.body}>
         {!token ? (
           <LoginScreen onSignedIn={signIn} />
