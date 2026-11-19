@@ -162,7 +162,7 @@ function LoginPhotosSwitch({ enabled }) {
 
   return (
     <>
-      <div className={`shots-switch${on ? ' on' : ''}`}>
+      <div className={`login-photos-switch${on ? ' on' : ''}`}>
         <button type="button" role="switch" aria-checked={on} className="shots-toggle" disabled={busy} onClick={toggle}>
           <span className="shots-toggle-knob" />
         </button>

@@ -269,6 +269,16 @@
 
 
 /* ===== my-track2 merge: new-feature styles ===== */
+/* Login history's photo switch is a ROW (toggle + label text), unlike the
+   screenshots .shots-switch which is the pill button itself — so it needs its
+   own wrapper class, or the .shots-switch { width:42px } rule above squashes
+   the row into a tiny box and the text overlaps the list below. */
+.login-photos-switch {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
 .shots-toggle {
   position: relative;
   flex-shrink: 0;
@@ -281,7 +291,7 @@
   cursor: pointer;
   transition: background 0.18s;
 }
-.shots-switch.on .shots-toggle {
+.login-photos-switch.on .shots-toggle {
   background: var(--accent);
 }
 .shots-toggle:disabled {
@@ -303,7 +313,7 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
   transition: transform 0.18s;
 }
-.shots-switch.on .shots-toggle-knob {
+.login-photos-switch.on .shots-toggle-knob {
   transform: translateX(20px);
 }
 .shots-switch-text {
