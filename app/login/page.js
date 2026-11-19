@@ -113,6 +113,9 @@ export default function LoginPage() {
         <p className="auth-foot">
           No account yet? <Link href="/register">Create one</Link>
         </p>
+        <p className="auth-foot">
+          <Link href="/download">📱 Download the app (Mac · Windows · Android · iPhone)</Link>
+        </p>
       </div>
     </div>
   );
