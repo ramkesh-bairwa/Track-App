@@ -1,0 +1,74 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; cursor: crosshair; user-select: none; -webkit-user-select: none; }
+  #shot { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; pointer-events: none; }
+  #dim { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.42); pointer-events: none; }
+  #box { position: fixed; display: none; outline: 1.5px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.6); pointer-events: none; }
+  .shade { position: fixed; display: none; background: rgba(0, 0, 0, 0.42); pointer-events: none; }
+  .hair { position: fixed; background: rgba(255, 255, 255, 0.55); pointer-events: none; }
+  #hx { left: 0; right: 0; height: 1px; }
+  #hy { top: 0; bottom: 0; width: 1px; }
+  #size, #hint { position: fixed; font: 600 12px -apple-system, "Segoe UI", sans-serif; color: #fff; background: rgba(17, 24, 39, 0.85); border-radius: 6px; padding: 4px 8px; pointer-events: none; white-space: nowrap; }
+  #size { display: none; }
+  #hint { top: 18px; left: 50%; transform: translateX(-50%); font-weight: 500; font-size: 13px; padding: 8px 14px; border-radius: 999px; }
+</style>
+</head>
+<body>
+<img id="shot" alt="">
+<div id="dim"></div>
+<div id="box"></div>
+<div class="shade" id="s1"></div><div class="shade" id="s2"></div><div class="shade" id="s3"></div><div class="shade" id="s4"></div>
+<div class="hair" id="hx"></div>
+<div class="hair" id="hy"></div>
+<div id="size"></div>
+<div id="hint">Drag to select an area · Click to capture this whole screen · Esc to cancel</div>
+<script>
+  const $ = (id) => document.getElementById(id);
+  let start = null;
+  let sent = false;
+  window.snip.onImage((url) => { $('shot').src = url; });
+  const send = (rect) => { if (!sent) { sent = true; window.snip.pick(rect); } };
+  function rectOf(e) {
+    const x = Math.min(start.x, e.clientX), y = Math.min(start.y, e.clientY);
+    return { x, y, width: Math.abs(e.clientX - start.x), height: Math.abs(e.clientY - start.y) };
+  }
+  document.addEventListener('mousemove', (e) => {
+    $('hx').style.top = e.clientY + 'px';
+    $('hy').style.left = e.clientX + 'px';
+    if (!start) return;
+    const r = rectOf(e);
+    const box = $('box');
+    Object.assign(box.style, { display: 'block', left: r.x + 'px', top: r.y + 'px', width: r.width + 'px', height: r.height + 'px' });
+    $('dim').style.display = 'none';
+    const px = (v) => v + 'px';
+    const shade = (id, l, t, w, h) => Object.assign($(id).style, { display: 'block', left: px(l), top: px(t), width: px(Math.max(0, w)), height: px(Math.max(0, h)) });
+    shade('s1', 0, 0, innerWidth, r.y);
+    shade('s2', 0, r.y + r.height, innerWidth, innerHeight - r.y - r.height);
+    shade('s3', 0, r.y, r.x, r.height);
+    shade('s4', r.x + r.width, r.y, innerWidth - r.x - r.width, r.height);
+    const s = $('size');
+    s.style.display = 'block';
+    s.textContent = `${Math.round(r.width)} × ${Math.round(r.height)}`;
+    s.style.left = Math.min(innerWidth - 110, r.x + r.width + 8) + 'px';
+    s.style.top = Math.min(innerHeight - 30, r.y + r.height + 8) + 'px';
+  });
+  document.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return send(null);
+    start = { x: e.clientX, y: e.clientY };
+    $('hint').style.display = 'none';
+  });
+  document.addEventListener('mouseup', (e) => {
+    if (!start) return;
+    const r = rectOf(e);
+    start = null;
+    send(r.width < 4 && r.height < 4 ? { whole: true } : r);
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') send(null); });
+  document.addEventListener('contextmenu', (e) => { e.preventDefault(); send(null); });
+</script>
+</body>
+</html>

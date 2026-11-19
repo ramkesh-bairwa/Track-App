@@ -28,7 +28,9 @@ const baseHeaders = [
   { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-  { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), payment=()' },
+  // camera=(self): the login page (and the desktop app on open) takes a
+  // security photo. Other sites in frames still can't use the camera.
+  { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=(), payment=()' },
   ...(isDev ? [] : [{ key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' }]),
 ];
 const withHeader = (key, value) => [...baseHeaders.filter((h) => h.key !== key), { key, value }];
@@ -48,6 +50,11 @@ const nextConfig = {
   reactStrictMode: true,
   // Don't advertise the framework in every response.
   poweredByHeader: false,
+  // The desktop app (desktop/) builds a self-contained server into its own
+  // folder, so building it never touches the .next folder `next dev` uses:
+  //   NEXT_DIST_DIR=.next-desktop NEXT_OUTPUT=standalone next build
+  distDir: process.env.NEXT_DIST_DIR || '.next',
+  ...(process.env.NEXT_OUTPUT === 'standalone' ? { output: 'standalone' } : {}),
   // archiver (used by the Backup feature) has a nested dependency with a
   // package.json `exports` map webpack's resolver rejects — keeping it out
   // of the bundle and requiring it natively at runtime avoids that entirely.

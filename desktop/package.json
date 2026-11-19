@@ -1,0 +1,97 @@
+{
+  "name": "mytrack-desktop",
+  "productName": "MyTrack",
+  "version": "1.0.0",
+  "description": "MyTrack as a desktop app for macOS and Windows, with its database stored on this computer.",
+  "author": "PodUp",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "fetch-db": "node scripts/fetch-mariadb.mjs",
+    "build-server": "node scripts/build-server.mjs",
+    "prepare-app": "npm run build-server && npm run fetch-db",
+    "start": "electron .",
+    "dist:mac": "npm run build-server && node scripts/fetch-mariadb.mjs --os mac && node scripts/build-camera-helper.mjs && electron-builder --mac",
+    "dist:win": "npm run build-server && node scripts/fetch-mariadb.mjs --os win && electron-builder --win",
+    "dist:all": "npm run build-server && node scripts/fetch-mariadb.mjs --os mac && node scripts/fetch-mariadb.mjs --os win && node scripts/build-camera-helper.mjs && electron-builder --mac --win"
+  },
+  "build": {
+    "appId": "com.podup.mytrack",
+    "productName": "MyTrack",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build-resources"
+    },
+    "files": [
+      "main.js",
+      "src/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "build/server.tar.gz",
+        "to": "server.tar.gz"
+      },
+      {
+        "from": "build/server-id.txt",
+        "to": "server-id.txt"
+      },
+      {
+        "from": "build/schema.sql",
+        "to": "schema.sql"
+      },
+      {
+        "from": "build/defaults.env",
+        "to": "defaults.env"
+      },
+      {
+        "from": "vendor/mariadb/${os}",
+        "to": "mariadb",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "asar": true,
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "extendInfo": {
+        "NSScreenCaptureUsageDescription": "MyTrack takes screenshots only while you switch Screenshots on.",
+        "NSMicrophoneUsageDescription": "The Screen recorder can add your microphone to a recording.",
+        "NSLocationUsageDescription": "The IP locator can use this device's location when you ask it to.",
+        "NSCameraUsageDescription": "MyTrack takes a security photo when someone signs in or opens the app (shown in Login history)."
+      },
+      "extraResources": [
+        {
+          "from": "vendor/camera-helper",
+          "to": "camera-helper",
+          "filter": [
+            "**/*"
+          ]
+        }
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false
+    }
+  },
+  "devDependencies": {
+    "electron": "^45.1.0",
+    "electron-builder": "^26.18.0"
+  },
+  "dependencies": {
+    "mysql2": "^3.24.6"
+  }
+}

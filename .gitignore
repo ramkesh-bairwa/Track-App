@@ -20,3 +20,10 @@ downloads/
 # OS / editor
 .DS_Store
 *.log
+
+# desktop app build artifacts
+.next-desktop/
+desktop/node_modules/
+desktop/build/
+desktop/dist/
+desktop/vendor/
