@@ -1205,6 +1205,10 @@ CREATE TRIGGER IF NOT EXISTS trg_system_events_sync_del AFTER DELETE ON system_e
 -- back to it from another app / window / tab. NULL = app lock off.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS app_lock_password VARCHAR(255) NULL;
 
+-- Login history camera photos (sign in, app opened / unlocked): 1 = on, 0 =
+-- off. Switched in Login history; when off the camera isn't used at all.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS login_photos TINYINT(1) NOT NULL DEFAULT 1;
+
 -- Track history: every change to a track, its columns and records, per track
 -- (sub-tracks have their own). Record changes keep each field's old and new
 -- value (lib/trackLog.js); a deleted record's data is kept in `snapshot` so it

@@ -11,6 +11,7 @@ import DesktopOpenPhoto from '@/components/DesktopOpenPhoto';
 import { chromeColorStyle, contentColorCss } from '@/lib/color';
 import { menuShown } from '@/lib/menuItems';
 import { appLockHash } from '@/lib/appLock';
+import { loginPhotosEnabled } from '@/lib/loginHistory';
 import AppLock from '@/components/AppLock';
 import ImpersonationBanner from '@/components/ImpersonationBanner';
 
@@ -24,6 +25,7 @@ export default async function DashboardLayout({ children }) {
     : [];
   // An admin using "Open as this user" isn't held up by that person's app lock.
   const appLocked = user && !user.impersonator ? Boolean(await appLockHash(user.id)) : false;
+  const loginPhotos = user ? await loginPhotosEnabled(user.id) : true;
 
   return (
     <>
@@ -41,10 +43,10 @@ export default async function DashboardLayout({ children }) {
           <ProfileMenu user={user} desktop={process.env.MYTRACK_DESKTOP === '1'} />
         </div>
         <main className="main">{children}</main>
-        {user && process.env.MYTRACK_DESKTOP === '1' && <DesktopOpenPhoto />}
+        {user && process.env.MYTRACK_DESKTOP === '1' && <DesktopOpenPhoto photos={loginPhotos} />}
       </div>
     </div>
-    {user && <AppLock enabled={appLocked} lockOnLeave={process.env.MYTRACK_DESKTOP !== '1'} user={{ name: user.name, avatar: user.avatar }} />}
+    {user && <AppLock enabled={appLocked} lockOnLeave={process.env.MYTRACK_DESKTOP !== '1'} user={{ name: user.name, avatar: user.avatar }} photos={loginPhotos} />}
     </>
   );
 }

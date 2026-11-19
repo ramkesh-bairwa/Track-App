@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { captureSelfie } from '@/lib/captureSelfie';
+import { captureSelfie, rememberLoginPhotos } from '@/lib/captureSelfie';
 
 // Fired by the App lock settings when the lock is turned on or off.
 export const APP_LOCK_EVENT = 'mytrack:app-lock';
@@ -22,7 +22,7 @@ export function lockAppNow() {
 // back from another app, window or tab. Leaving for a file picker or into an
 // embedded preview (iframe) doesn't count. The desktop app doesn't lock on
 // leave: it signs out when it quits (Mac log out / restart / shut down).
-export default function AppLock({ enabled: initialEnabled, lockOnLeave = true, user }) {
+export default function AppLock({ enabled: initialEnabled, lockOnLeave = true, user, photos = true }) {
   const router = useRouter();
   const [enabled, setEnabled] = useState(initialEnabled);
   const [locked, setLocked] = useState(initialEnabled);
@@ -39,10 +39,14 @@ export default function AppLock({ enabled: initialEnabled, lockOnLeave = true, u
   // attached to the unlock attempt — right or wrong password — in Login
   // history). At most one every 10 seconds.
   const takePhoto = useCallback(() => {
-    if (Date.now() - lastPhotoAt.current < 10000) return;
+    if (!photos || Date.now() - lastPhotoAt.current < 10000) return;
     lastPhotoAt.current = Date.now();
     photo.current = { promise: captureSelfie().catch(() => ({ photo: null })) };
-  }, []);
+  }, [photos]);
+
+  // Rendered on every dashboard page: keep this browser's copy of the login
+  // photos setting current for the next visit to the login page.
+  useEffect(() => rememberLoginPhotos(photos), [photos]);
 
   const attachPhoto = useCallback((eventId) => {
     const pending = photo.current;

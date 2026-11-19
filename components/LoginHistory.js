@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { DATE_LOCALE } from '@/lib/dateLocale';
+import { rememberLoginPhotos } from '@/lib/captureSelfie';
 import '@/components/screenshots/screenshots.css'; // the on/off switch styles
 
 function when(v) {
@@ -132,12 +133,62 @@ function SourceBadge({ source }) {
   return <span className={`login-source ${source === 'desktop' ? 'desktop' : 'web'}`}>{source === 'desktop' ? 'Desktop app' : 'Web'}</span>;
 }
 
-function MyTrackTab({ logins, onZoom, onDelete }) {
+// On / off switch for this account's login photos (sign in, app opened /
+// unlocked). The history itself is kept either way.
+function LoginPhotosSwitch({ enabled }) {
+  const [on, setOn] = useState(enabled);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  async function toggle() {
+    setBusy(true);
+    setError('');
+    try {
+      const res = await fetch('/api/auth/login-history/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: !on }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || 'Could not change it.');
+      setOn(json.enabled);
+      rememberLoginPhotos(json.enabled);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <div className={`shots-switch${on ? ' on' : ''}`}>
+        <button type="button" role="switch" aria-checked={on} className="shots-toggle" disabled={busy} onClick={toggle}>
+          <span className="shots-toggle-knob" />
+        </button>
+        <span className="shots-switch-text">
+          <strong>{on ? 'Login photos on' : 'Login photos off'}</strong>
+          <span>
+            {on
+              ? 'A camera photo is taken when you sign in, and when MyTrack is opened or unlocked.'
+              : 'The camera is not used. Sign-ins and openings are still recorded here, without a photo.'}
+          </span>
+        </span>
+      </div>
+      {error && <div className="top-error">{error}</div>}
+    </>
+  );
+}
+
+function MyTrackTab({ logins, photosEnabled, onZoom, onDelete }) {
   const groups = useMemo(() => groupLogins(logins), [logins]);
+  const toggle = <LoginPhotosSwitch enabled={photosEnabled} />;
   if (groups.length === 0) {
-    return <div className="empty-state"><h3>No logins recorded yet</h3><p>Your next login will appear here.</p></div>;
+    return <>{toggle}<div className="empty-state"><h3>No logins recorded yet</h3><p>Your next login will appear here.</p></div></>;
   }
   return (
+    <>
+    {toggle}
     <div className="login-history">
       {groups.map((g, i) => (
         <div key={g.login?.uuid || `opens-${i}`} className="login-group">
@@ -191,6 +242,7 @@ function MyTrackTab({ logins, onZoom, onDelete }) {
         </div>
       ))}
     </div>
+    </>
   );
 }
 
@@ -264,7 +316,7 @@ function SystemTab({ system, isDesktop, enabled, onZoom, onDelete }) {
   );
 }
 
-export default function LoginHistory({ logins, system, isDesktop, systemEnabled }) {
+export default function LoginHistory({ logins, system, isDesktop, systemEnabled, photosEnabled }) {
   const router = useRouter();
   const [zoom, setZoom] = useState(null);
   const [tab, setTab] = useState('mytrack');
@@ -316,7 +368,7 @@ export default function LoginHistory({ logins, system, isDesktop, systemEnabled 
       </div>
 
       {activeTab === 'mytrack' ? (
-        <MyTrackTab logins={logins} onZoom={setZoom} onDelete={setConfirm} />
+        <MyTrackTab logins={logins} photosEnabled={photosEnabled} onZoom={setZoom} onDelete={setConfirm} />
       ) : (
         <SystemTab system={system} isDesktop={isDesktop} enabled={systemEnabled} onZoom={setZoom} onDelete={setConfirm} />
       )}

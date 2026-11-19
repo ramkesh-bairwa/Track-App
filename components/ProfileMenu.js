@@ -170,6 +170,16 @@ export default function ProfileMenu({ user, desktop = false }) {
           </button>
           <button
             type="button"
+            className="profile-menu-item"
+            onClick={() => {
+              setOpen(false);
+              router.push('/download');
+            }}
+          >
+            📱 Get the app
+          </button>
+          <button
+            type="button"
             className="profile-menu-item profile-menu-item-danger"
             onClick={handleLogout}
           >

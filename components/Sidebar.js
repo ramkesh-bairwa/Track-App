@@ -410,6 +410,13 @@ export default function Sidebar({ user, tracks }) {
           <span>Testing feedback</span>
         </Link>
       )}
+      <Link
+        href="/download"
+        className={`sidebar-tasks-link${pathname.startsWith('/download') ? ' active' : ''}`}
+      >
+        <i className="fa-solid fa-mobile-screen-button" />
+        <span>Get the app</span>
+      </Link>
       {user?.is_admin && menuShown(user, 'screenshots') && (
         <Link
           href="/dashboard/screenshots"

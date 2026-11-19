@@ -5,6 +5,11 @@
    over decoration.
 ----------------------------------------------------------- */
 :root {
+  /* Tell the browser this is a dark UI so native form controls (input text,
+     caret, autofill) use dark-mode colors. Without this, on a Mac set to Light
+     appearance the desktop app rendered typed text in near-black on the dark
+     inputs — invisible. */
+  color-scheme: dark;
   --bg: #12151a;
   --panel: #181c24;
   --panel-raised: #1f2430;
@@ -35,6 +40,7 @@
 }
 
 :root[data-theme='light'] {
+  color-scheme: light;
   --bg: #f4f5f7;
   --panel: #ffffff;
   --panel-raised: #edeff3;

@@ -50,7 +50,7 @@ export const POST = withApiErrors(async (request) => {
   }
 
   const token = await createSessionToken({ sub: String(result.insertId), name, email });
-  const response = NextResponse.json({ ok: true });
+  const response = NextResponse.json({ ok: true, token });
   response.cookies.set(SESSION_COOKIE, token, {
     httpOnly: true,
     // HTTPS-only in production; plain http://localhost keeps working in dev.

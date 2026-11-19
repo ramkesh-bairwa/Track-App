@@ -57,7 +57,9 @@ export const POST = withApiErrors(async (request) => {
   });
 
   const token = await createSessionToken({ sub: String(user.id), name: user.name, email: user.email });
-  const response = NextResponse.json({ ok: true, eventId });
+  // `token` lets non-browser clients (the mobile app) authenticate with
+  // `Authorization: Bearer <token>`; browsers use the httpOnly cookie below.
+  const response = NextResponse.json({ ok: true, eventId, token });
   response.cookies.set(SESSION_COOKIE, token, {
     httpOnly: true,
     // HTTPS-only in production; plain http://localhost keeps working in dev.
