@@ -65,6 +65,8 @@ rsync -az --delete $PROGRESS -e "ssh $SSH_OPTS" \
   --exclude 'desktop/dist/' \
   --exclude 'desktop/build/' \
   --exclude 'desktop/vendor/' \
+  --exclude 'mobile/.expo/' \
+  --exclude 'mobile/dist/' \
   --exclude '.DS_Store' \
   ./ "$SERVER:$APP_DIR/"
 
