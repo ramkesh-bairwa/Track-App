@@ -85,7 +85,8 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "perMachine": false
-    }
+    },
+    "afterPack": "scripts/afterPack.cjs"
   },
   "devDependencies": {
     "electron": "^45.1.0",
