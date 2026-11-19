@@ -3,6 +3,7 @@ import { query } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { slugifyKey, fieldTypeMeta } from '@/lib/fieldTypes';
 import { withApiErrors } from '@/lib/apiError';
+import { logTrack } from '@/lib/trackLog';
 
 async function assertOwnership(trackId, userId) {
   const rows = await query('SELECT id FROM tracks WHERE id = ? AND user_id = ?', [trackId, userId]);
@@ -57,6 +58,16 @@ export const POST = withApiErrors(async (request, { params }) => {
       [trackId, label, key, fieldType, options, fieldLength, autoIncrement ? 1 : 0, position]
     );
 
+    await logTrack({
+      trackId,
+      user,
+      action: 'column_add',
+      summary: `Added column “${label}”`,
+      changes: [
+        { key: 'type', label: 'Type', newText: fieldTypeMeta(fieldType).label },
+        ...(options ? [{ key: 'options', label: 'Options', newText: String(options) }] : []),
+      ],
+    });
     return NextResponse.json({
       ok: true,
       column: {
@@ -87,10 +98,17 @@ export const PATCH = withApiErrors(async (request, { params }) => {
   }
   const body = await request.json().catch(() => ({}));
   const order = Array.isArray(body.order) ? body.order : [];
+  const before = await query('SELECT id, label FROM track_columns WHERE track_id = ? ORDER BY position ASC, id ASC', [trackId]);
   await Promise.all(
     order.map((colId, index) =>
       query('UPDATE track_columns SET position = ? WHERE id = ? AND track_id = ?', [index, colId, trackId])
     )
   );
+  const label = new Map(before.map((c) => [c.id, c.label]));
+  const was = before.map((c) => c.label).join(', ');
+  const now = order.map((id) => label.get(Number(id))).filter(Boolean).join(', ');
+  if (now && was !== now) {
+    await logTrack({ trackId, user, action: 'column_reorder', summary: 'Reordered columns', changes: [{ key: 'order', label: 'Order', oldText: was, newText: now }] });
+  }
   return NextResponse.json({ ok: true });
 });

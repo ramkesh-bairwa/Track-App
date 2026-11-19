@@ -31,7 +31,7 @@ export default function PrivacyPasswordModal({
         setLoading(false);
         return;
       }
-      await onVerified();
+      await onVerified(password);
     } catch (err) {
       setError(err?.message || 'Something went wrong. Try again.');
       setLoading(false);

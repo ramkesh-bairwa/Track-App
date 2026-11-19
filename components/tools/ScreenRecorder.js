@@ -2,6 +2,53 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import './screen-recorder.css';
+import AreaPicker from './AreaPicker';
+import { composeStream } from './recordCompose';
+
+const MODES = [
+  { id: 'area', icon: 'fa-vector-square', label: 'Selected area', hint: 'Drag a box anywhere on the screen' },
+  { id: 'screen', icon: 'fa-desktop', label: 'Single screen', hint: 'One whole screen' },
+  { id: 'all', icon: 'fa-table-columns', label: 'All screens', hint: 'Every screen in one video' },
+  { id: 'window', icon: 'fa-window-maximize', label: 'Window / tab', hint: 'Pick a window or browser tab' },
+];
+// Output size limit per quality (the picture is only ever scaled down).
+const LIMITS = { '720': [1280, 720], '1080': [1920, 1080], source: [7680, 4320] };
+const nativeRecorder = () => (typeof window !== 'undefined' ? window.mytrackDesktop?.recorder : null);
+
+// One frame of a live stream, for choosing an area on it.
+async function frameOf(stream) {
+  const v = document.createElement('video');
+  v.muted = true;
+  v.playsInline = true;
+  v.srcObject = stream;
+  await v.play();
+  if (!v.videoWidth) await new Promise((r) => v.addEventListener('loadedmetadata', r, { once: true }));
+  await new Promise((r) => setTimeout(r, 250));
+  const c = document.createElement('canvas');
+  c.width = v.videoWidth;
+  c.height = v.videoHeight;
+  c.getContext('2d').drawImage(v, 0, 0);
+  v.srcObject = null;
+  return c;
+}
+
+// A screen from the Mac app, recorded directly (no browser prompt).
+function nativeScreen(src, [maxW, maxH]) {
+  const w = Math.round(src.width * src.scaleFactor);
+  const h = Math.round(src.height * src.scaleFactor);
+  return navigator.mediaDevices.getUserMedia({
+    audio: false,
+    video: {
+      mandatory: {
+        chromeMediaSource: 'desktop',
+        chromeMediaSourceId: src.sourceId,
+        maxWidth: Math.min(w, Math.max(maxW, 1)),
+        maxHeight: Math.min(h, Math.max(maxH, 1)),
+        maxFrameRate: 30,
+      },
+    },
+  });
+}
 
 const MIME_TYPES = [
   'video/webm;codecs=vp9,opus',
@@ -88,6 +135,17 @@ function Recording({ rec, onDelete }) {
   );
 }
 
+function modeHint(mode, native) {
+  if (mode === 'area') {
+    return native
+      ? 'MyTrack hides and your screens dim: drag a box anywhere, on any screen. Click once to record that whole screen; Esc cancels.'
+      : 'Choose “Entire screen” in the prompt; it then fills your display so you can drag the box to record.';
+  }
+  if (mode === 'screen') return native ? 'Records the chosen screen straight away — no prompt.' : 'Choose “Entire screen” in the prompt.';
+  if (mode === 'all') return native ? 'Every screen in one video, arranged as in Display settings.' : 'Pick each screen in turn; they are joined side by side.';
+  return 'Pick a window or browser tab in the prompt.';
+}
+
 // Records a screen, window or tab entirely in the browser with MediaRecorder.
 // Nothing is uploaded; recordings live as object URLs until the page closes.
 export default function ScreenRecorder() {
@@ -103,6 +161,12 @@ export default function ScreenRecorder() {
   const [error, setError] = useState('');
   const [recordings, setRecordings] = useState([]);
   const [live, setLive] = useState(null); // the stream being recorded, for the live preview
+  const [mode, setMode] = useState('area');
+  const [native, setNative] = useState(false);
+  const [displays, setDisplays] = useState([]);
+  const [displayId, setDisplayId] = useState('cursor');
+  const [areaImage, setAreaImage] = useState(null);
+  const areaResolve = useRef(null);
 
   const session = useRef(null); // { streams, audioCtx, recorder, chunks, ... }
   const recordingsRef = useRef([]);
@@ -111,6 +175,9 @@ export default function ScreenRecorder() {
 
   useEffect(() => {
     setSupported(Boolean(navigator.mediaDevices?.getDisplayMedia) && typeof MediaRecorder !== 'undefined');
+    const api = nativeRecorder();
+    setNative(Boolean(api));
+    api?.displays().then((list) => setDisplays(list || [])).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -126,6 +193,7 @@ export default function ScreenRecorder() {
     const s = session.current;
     clearInterval(countdownTimer.current);
     if (!s) return;
+    s.composer?.stop();
     s.streams.forEach((st) => st.getTracks().forEach((t) => t.stop()));
     s.audioCtx?.close().catch(() => {});
     clearInterval(s.tick);
@@ -224,16 +292,90 @@ export default function ScreenRecorder() {
     setNotice('');
     if (!supported) return;
     setPhase('picking');
-    let display;
+    const notes = [];
+    const streams = [];
+    let videoTrack;
+    let displayAudio = null;
+    let composer = null;
+    const limit = LIMITS[quality];
+    const cancelled = () => {
+      streams.forEach((st) => st.getTracks().forEach((t) => t.stop()));
+      composer?.stop();
+      setPhase('idle');
+      setNotice('Cancelled — nothing was recorded.');
+    };
+
     try {
-      display = await navigator.mediaDevices.getDisplayMedia({
-        video: QUALITY[quality].video,
-        audio: systemAudio,
-        // Chrome-only hints; other browsers ignore them.
-        selfBrowserSurface: 'include',
-        systemAudio: systemAudio ? 'include' : 'exclude',
-      });
+      const api = nativeRecorder();
+      if (api && mode !== 'window') {
+        // Mac app: record the screen(s) directly; "area" shows the overlay.
+        const r = await api.sources({ mode, displayId });
+        if (r?.canceled) return cancelled();
+        if (r?.error) throw new Error(r.error);
+        for (const src of r.sources) streams.push(await nativeScreen(src, mode === 'screen' && !r.crop ? limit : [7680, 4320]));
+        if (mode === 'screen' && !r.crop) {
+          videoTrack = streams[0].getVideoTracks()[0];
+        } else {
+          composer = await composeStream({
+            layers: r.sources.map((src, i) => ({ stream: streams[i], x: src.x, y: src.y, width: src.width, height: src.height })),
+            crop: r.crop,
+            maxW: limit[0],
+            maxH: limit[1],
+          });
+          videoTrack = composer.track;
+        }
+        if (systemAudio) notes.push('Sound from the Mac itself can’t be recorded here; turn on the microphone to record your voice.');
+      } else {
+        const ask = (surface, withAudio) =>
+          navigator.mediaDevices.getDisplayMedia({
+            video: { ...QUALITY[quality].video, ...(mode === 'area' || mode === 'all' ? { width: { ideal: 7680 }, height: { ideal: 4320 } } : {}), displaySurface: surface },
+            audio: withAudio,
+            // Chrome-only hints; other browsers ignore them.
+            selfBrowserSurface: 'include',
+            systemAudio: withAudio ? 'include' : 'exclude',
+          });
+        if (mode === 'all') {
+          do {
+            streams.push(await ask('monitor', streams.length === 0 && systemAudio));
+          } while (window.confirm(`${streams.length} screen${streams.length > 1 ? 's' : ''} chosen. Add another screen?`));
+          displayAudio = streams[0].getAudioTracks()[0] || null;
+          let x = 0;
+          const layers = streams.map((st) => {
+            const { width = 1920, height = 1080 } = st.getVideoTracks()[0].getSettings();
+            const l = { stream: st, x, y: 0, width, height };
+            x += width;
+            return l;
+          });
+          composer = await composeStream({ layers, maxW: limit[0] * 2, maxH: limit[1] });
+          videoTrack = composer.track;
+        } else {
+          const display = await ask(mode === 'window' ? 'window' : 'monitor', systemAudio);
+          streams.push(display);
+          displayAudio = display.getAudioTracks()[0] || null;
+          if (mode === 'area') {
+            const frame = await frameOf(display);
+            const box = await new Promise((resolve) => {
+              areaResolve.current = resolve;
+              setAreaImage(frame);
+            });
+            if (box === undefined) return cancelled();
+            const { width, height } = { width: frame.width, height: frame.height };
+            composer = await composeStream({
+              layers: [{ stream: display, x: 0, y: 0, width, height }],
+              crop: box,
+              maxW: limit[0],
+              maxH: limit[1],
+            });
+            videoTrack = composer.track;
+          } else {
+            videoTrack = display.getVideoTracks()[0];
+          }
+        }
+        if (systemAudio && !displayAudio) notes.push('No tab/system audio was shared, so the video has no sound from the screen.');
+      }
     } catch (err) {
+      streams.forEach((st) => st.getTracks().forEach((t) => t.stop()));
+      composer?.stop();
       setPhase('idle');
       if (err.name === 'NotAllowedError' || err.name === 'AbortError') {
         setNotice('Screen sharing was cancelled — nothing was recorded.');
@@ -242,12 +384,6 @@ export default function ScreenRecorder() {
       }
       return;
     }
-
-    const notes = [];
-    const streams = [display];
-    const videoTrack = display.getVideoTracks()[0];
-    const displayAudio = display.getAudioTracks()[0];
-    if (systemAudio && !displayAudio) notes.push('No tab/system audio was shared, so the video has no sound from the screen.');
 
     let micTrack = null;
     if (mic) {
@@ -285,6 +421,7 @@ export default function ScreenRecorder() {
 
     const stream = new MediaStream(audioTrack ? [videoTrack, audioTrack] : [videoTrack]);
     session.current = {
+      composer,
       streams,
       audioCtx,
       stream,
@@ -296,8 +433,8 @@ export default function ScreenRecorder() {
       pausedAt: 0,
       audioLabel,
     };
-    // The browser's own "Stop sharing" bar ends the video track.
-    videoTrack.addEventListener('ended', stop);
+    // The browser's own "Stop sharing" bar ends the screen's video track.
+    streams.forEach((st) => st.getVideoTracks().forEach((t) => t.addEventListener('ended', stop)));
     setLive(stream);
     if (notes.length) setNotice(notes.join(' '));
 
@@ -349,6 +486,36 @@ export default function ScreenRecorder() {
     <div className="tool-split">
       <div className="tool-panel">
         <h2>Options</h2>
+        <fieldset className="rec-fieldset" disabled={busy || !supported}>
+          <legend className="field-label">What to record</legend>
+          <div className="shot-modes rec-modes" role="radiogroup" aria-label="What to record">
+            {MODES.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                role="radio"
+                aria-checked={mode === m.id}
+                className={`shot-mode${mode === m.id ? ' on' : ''}`}
+                onClick={() => setMode(m.id)}
+              >
+                <i className={`fa-solid ${m.icon}`} />
+                <strong>{m.label}</strong>
+                <small>{m.hint}</small>
+              </button>
+            ))}
+          </div>
+          {mode === 'screen' && native && displays.length > 1 && (
+            <select className="input input-sm" value={displayId} onChange={(e) => setDisplayId(e.target.value)} aria-label="Screen" style={{ marginTop: 8 }}>
+              <option value="cursor">Screen with the mouse</option>
+              {displays.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.label} — {d.width}×{d.height}{d.primary ? ' (main)' : ''}
+                </option>
+              ))}
+            </select>
+          )}
+          <p className="field-hint">{modeHint(mode, native)}</p>
+        </fieldset>
         {!supported && (
           <div className="top-error" role="alert">
             This browser can’t record the screen. Use a recent desktop Chrome, Edge, Firefox or Safari —
@@ -464,6 +631,19 @@ export default function ScreenRecorder() {
           )}
         </div>
       </div>
+      {areaImage && (
+        <AreaPicker
+          image={areaImage}
+          onDone={(_c, box) => {
+            setAreaImage(null);
+            areaResolve.current?.(box);
+          }}
+          onCancel={() => {
+            setAreaImage(null);
+            areaResolve.current?.(undefined);
+          }}
+        />
+      )}
     </div>
   );
 }

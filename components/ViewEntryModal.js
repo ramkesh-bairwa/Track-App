@@ -70,7 +70,7 @@ export function FieldValue({ column, value }) {
   return <span style={{ whiteSpace: 'pre-wrap' }}>{String(formatDisplayValue(column, value))}</span>;
 }
 
-export default function ViewEntryModal({ columns, entry, serial, onClose, onEdit }) {
+export default function ViewEntryModal({ columns, entry, serial, onClose, onEdit, onHistory }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -96,6 +96,9 @@ export default function ViewEntryModal({ columns, entry, serial, onClose, onEdit
         </dl>
         <div className="modal-actions">
           <button type="button" className="btn btn-ghost" onClick={onClose}>Close</button>
+          {onHistory && (
+            <button type="button" className="btn" onClick={onHistory}>🕘 History</button>
+          )}
           {onEdit && (
             <button type="button" className="btn btn-primary" onClick={onEdit}>Edit entry</button>
           )}

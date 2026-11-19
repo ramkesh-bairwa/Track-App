@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { query, getPool } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { withApiErrors } from '@/lib/apiError';
+import { logTrack, propChange } from '@/lib/trackLog';
 
 async function assertOwnership(trackId, userId) {
   const rows = await query('SELECT id FROM tracks WHERE id = ? AND user_id = ?', [trackId, userId]);
@@ -33,6 +34,8 @@ export const PATCH = withApiErrors(async (request, { params }) => {
       : null;
 
   const showSerial = typeof body.show_serial === 'boolean' ? (body.show_serial ? 1 : 0) : null;
+  const beforeTrack = (await query('SELECT page_size, show_serial FROM tracks WHERE id = ?', [trackId]))[0];
+  const beforeCols = await query('SELECT id, label, is_filterable, is_searchable FROM track_columns WHERE track_id = ? ORDER BY position ASC, id ASC', [trackId]);
 
   const pool = getPool();
   const conn = await pool.getConnection();
@@ -80,5 +83,17 @@ export const PATCH = withApiErrors(async (request, { params }) => {
     'SELECT * FROM track_columns WHERE track_id = ? ORDER BY position ASC, id ASC',
     [trackId]
   );
+  const changes = [];
+  if (beforeTrack.page_size !== trackRows[0].page_size) changes.push(propChange('page_size', 'Rows per page', String(beforeTrack.page_size), String(trackRows[0].page_size)));
+  if (Boolean(beforeTrack.show_serial) !== Boolean(trackRows[0].show_serial)) {
+    changes.push(propChange('show_serial', 'Sr. No. column', beforeTrack.show_serial ? 'On' : 'Off', trackRows[0].show_serial ? 'On' : 'Off'));
+  }
+  const names = (list, flag) => list.filter((c) => c[flag]).map((c) => c.label).join(', ') || 'none';
+  for (const [flag, label] of [['is_filterable', 'Filters'], ['is_searchable', 'Searchable']]) {
+    const was = names(beforeCols, flag);
+    const now = names(columns, flag);
+    if (was !== now) changes.push(propChange(flag, label, was, now));
+  }
+  if (changes.length) await logTrack({ trackId, user, action: 'track_settings', summary: 'Changed track settings', changes });
   return NextResponse.json({ page_size: trackRows[0].page_size, show_serial: Boolean(trackRows[0].show_serial), columns });
 });

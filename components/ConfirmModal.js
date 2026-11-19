@@ -10,6 +10,7 @@ export default function ConfirmModal({
   danger = false,
   onConfirm,
   onClose,
+  children,
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -31,6 +32,7 @@ export default function ConfirmModal({
       <div className="modal modal-sm" onClick={(e) => e.stopPropagation()}>
         <h2>{title}</h2>
         {message && <p className="confirm-message">{message}</p>}
+        {children}
         {error && <div className="top-error">{error}</div>}
         <div className="modal-actions">
           <button type="button" className="btn btn-ghost" onClick={onClose} disabled={loading}>

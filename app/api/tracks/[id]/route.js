@@ -4,6 +4,10 @@ import { getCurrentUser } from '@/lib/auth';
 import { sanitizeIcon } from '@/lib/icon';
 import { withApiErrors } from '@/lib/apiError';
 import { TRACK_VIEW_TYPES } from '@/lib/trackTypes';
+import { logTrack, propChange } from '@/lib/trackLog';
+import { checkDeletePassword } from '@/lib/deleteGuard';
+
+const trackName = async (id) => (id ? (await query('SELECT name FROM tracks WHERE id = ?', [id]))[0]?.name || '' : '');
 
 async function assertOwnership(trackId, userId) {
   const rows = await query('SELECT id FROM tracks WHERE id = ? AND user_id = ?', [trackId, userId]);
@@ -40,6 +44,7 @@ export const PATCH = withApiErrors(async (request, { params }) => {
   }
 
   const body = await request.json().catch(() => ({}));
+  const before = (await query('SELECT * FROM tracks WHERE id = ?', [trackId]))[0];
   const fields = [];
   const values = [];
   if (typeof body.name === 'string' && body.name.trim()) {
@@ -120,6 +125,32 @@ export const PATCH = withApiErrors(async (request, { params }) => {
     }
     throw err;
   }
+
+  const after = (await query('SELECT * FROM tracks WHERE id = ?', [trackId]))[0];
+  const changes = [];
+  const cmp = (key, label, fmt = (v) => v ?? '') => {
+    if (String(before[key] ?? '') !== String(after[key] ?? '')) changes.push(propChange(key, label, fmt(before[key]), fmt(after[key])));
+  };
+  cmp('name', 'Name');
+  cmp('description', 'Description');
+  cmp('color', 'Colour');
+  cmp('view_type', 'Layout', (v) => TRACK_VIEW_TYPES.find((t) => t.key === v)?.label || v || '');
+  if (before.icon !== after.icon || before.icon_type !== after.icon_type) {
+    changes.push({ key: 'icon', label: 'Icon', oldText: '', newText: after.icon_type === 'image' ? 'New image' : after.icon || '' });
+  }
+  if (String(before.parent_id ?? '') !== String(after.parent_id ?? '')) {
+    const from = (await trackName(before.parent_id)) || 'top level';
+    const to = (await trackName(after.parent_id)) || 'top level';
+    changes.push(propChange('parent', 'Moved', from, to));
+    if (before.parent_id) await logTrack({ trackId: before.parent_id, user, action: 'subtrack_remove', summary: `Sub-track “${after.name}” moved to ${to}` });
+    if (after.parent_id) await logTrack({ trackId: after.parent_id, user, action: 'subtrack_add', summary: `Sub-track “${after.name}” moved here from ${from}` });
+  }
+  if (changes.length) {
+    const only = changes.length === 1 ? changes[0].key : '';
+    const summary =
+      only === 'name' ? `Renamed track to “${after.name}”` : only === 'parent' ? 'Moved track' : only === 'view_type' ? 'Changed layout' : 'Edited track details';
+    await logTrack({ trackId, user, action: 'track_update', summary, changes });
+  }
   return NextResponse.json({ ok: true });
 });
 
@@ -130,6 +161,9 @@ export const DELETE = withApiErrors(async (request, { params }) => {
   if (!(await assertOwnership(trackId, user.id))) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
+
+  const denied = await checkDeletePassword(request, user);
+  if (denied) return denied;
 
   // parent_id has no DB-level foreign key (see schema.sql), so sub-tracks at any
   // depth are cascaded here rather than left orphaned or blocking the delete.
@@ -143,6 +177,27 @@ export const DELETE = withApiErrors(async (request, { params }) => {
     [trackId]
   );
   const ids = descendants.map((r) => r.id);
+  // History is kept: the deleted track gets a last line, and its parent
+  // (for a sub-track) a line about it.
+  const gone = (await query('SELECT name, parent_id FROM tracks WHERE id = ?', [trackId]))[0];
+  if (gone) {
+    const counts = (await query(
+      `SELECT COUNT(*) AS n FROM track_entries WHERE track_id IN (${ids.map(() => '?').join(',')})`,
+      ids
+    ))[0];
+    const subs = ids.length - 1;
+    const what = `(${counts.n} record${Number(counts.n) === 1 ? '' : 's'}${subs ? `, ${subs} sub-track${subs === 1 ? '' : 's'}` : ''})`;
+    const parentName = gone.parent_id ? (await query('SELECT name FROM tracks WHERE id = ?', [gone.parent_id]))[0]?.name : null;
+    await logTrack({
+      trackId,
+      user,
+      action: 'track_delete',
+      summary: `Deleted ${gone.parent_id ? 'sub-track' : 'track'} “${gone.name}” ${what}${parentName ? ` from “${parentName}”` : ''}`,
+    });
+    if (gone.parent_id) {
+      await logTrack({ trackId: gone.parent_id, user, action: 'subtrack_delete', summary: `Deleted sub-track “${gone.name}” ${what}` });
+    }
+  }
   await query(
     `DELETE FROM tracks WHERE user_id = ? AND id IN (${ids.map(() => '?').join(',')})`,
     [user.id, ...ids]

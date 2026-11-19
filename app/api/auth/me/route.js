@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-import { getCurrentUser, hashPassword, verifyPassword } from '@/lib/auth';
+import { impersonationBlock, getCurrentUser, hashPassword, verifyPassword } from '@/lib/auth';
 import { withApiErrors } from '@/lib/apiError';
 
 const AVATAR_DATA_URL = /^data:image\/(png|jpe?g|webp|gif);base64,/;
@@ -17,6 +17,7 @@ export const PATCH = withApiErrors(async (request) => {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await request.json().catch(() => ({}));
+  if (body.newPassword && impersonationBlock(user)) return NextResponse.json({ error: impersonationBlock(user) }, { status: 403 });
   const fields = [];
   const values = [];
 

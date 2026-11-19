@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-import { getCurrentUser, hashPassword, verifyPassword } from '@/lib/auth';
+import { impersonationBlock, getCurrentUser, hashPassword, verifyPassword } from '@/lib/auth';
 import { withApiErrors } from '@/lib/apiError';
 
 export const GET = withApiErrors(async () => {
@@ -16,6 +16,7 @@ export const GET = withApiErrors(async () => {
 export const PATCH = withApiErrors(async (request) => {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (impersonationBlock(user)) return NextResponse.json({ error: impersonationBlock(user) }, { status: 403 });
 
   const body = await request.json().catch(() => ({}));
   const rows = await query('SELECT action_password FROM users WHERE id = ?', [user.id]);

@@ -46,6 +46,9 @@ function Actions({ entry, actions, compact }) {
           <button type="button" className={cls} onClick={() => actions.onLock(entry)}>🔒 Lock</button>
         </>
       )}
+      {actions.onHistory && (
+        <button type="button" className={cls} onClick={() => actions.onHistory(entry)} title="History of this record">🕘 History</button>
+      )}
       <button
         type="button"
         className={`${cls} ${compact ? 'danger' : 'entry-card-btn-danger'}`}

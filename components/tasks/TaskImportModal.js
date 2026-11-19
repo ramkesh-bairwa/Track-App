@@ -34,7 +34,7 @@ function downloadTemplate(board, columns, people) {
   URL.revokeObjectURL(url);
 }
 
-// Import tasks from an Excel / CSV file: pick the file, check how its columns
+// Import tasks from an Excel / CSV / JSON file: pick the file, check how its columns
 // line up with task fields, review the rows, then create them in one go.
 // `allowNewColumns` (admin) lets extra headers become new board columns;
 // `createColumns` makes that the default for every unmatched header.
@@ -142,7 +142,7 @@ export default function TaskImportModal({ board, columns, people, onClose, onImp
           <div>
             <h2>Import tasks</h2>
             <p className="new-track-steps">
-              {sheet ? `${sheet.fileName} · ${sheet.rows.length} row${sheet.rows.length === 1 ? '' : 's'}` : 'From an Excel (.xlsx) or CSV file'}
+              {sheet ? `${sheet.fileName} · ${sheet.rows.length} row${sheet.rows.length === 1 ? '' : 's'}` : 'From an Excel (.xlsx), CSV or JSON file'}
             </p>
           </div>
           {!inline && (
@@ -167,7 +167,7 @@ export default function TaskImportModal({ board, columns, people, onClose, onImp
             >
               <input
                 type="file"
-                accept=".xlsx,.csv,.tsv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                accept=".xlsx,.csv,.tsv,.json,text/csv,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 style={{ display: 'none' }}
                 onChange={(e) => {
                   handleFile(e.target.files?.[0]);

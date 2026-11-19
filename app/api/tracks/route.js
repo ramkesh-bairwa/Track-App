@@ -6,6 +6,7 @@ import { slugifyKey, fieldTypeMeta } from '@/lib/fieldTypes';
 import { sanitizeIcon } from '@/lib/icon';
 import { withApiErrors } from '@/lib/apiError';
 import { normalizeViewType } from '@/lib/trackTypes';
+import { logTrack } from '@/lib/trackLog';
 
 export const GET = withApiErrors(async () => {
   const user = await getCurrentUser();
@@ -105,6 +106,21 @@ export const POST = withApiErrors(async (request) => {
     }
 
     await conn.commit();
+    const columnNames = columns.map((c) => (c.label || '').trim()).filter(Boolean);
+    await logTrack({
+      trackId,
+      user,
+      action: 'track_create',
+      summary: `Created ${parentId ? 'sub-track' : 'track'} “${name}”`,
+      changes: [
+        { key: 'name', label: 'Name', newText: name },
+        ...(description ? [{ key: 'description', label: 'Description', newText: description }] : []),
+        ...(columnNames.length ? [{ key: 'columns', label: 'Columns', newText: columnNames.join(', ') }] : []),
+      ],
+    });
+    if (parentId) {
+      await logTrack({ trackId: parentId, user, action: 'subtrack_add', summary: `Added sub-track “${name}”` });
+    }
     return NextResponse.json({ ok: true, trackId, trackUuid });
   } catch (err) {
     await conn.rollback();

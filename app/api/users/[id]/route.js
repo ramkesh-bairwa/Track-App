@@ -4,13 +4,16 @@ import { getCurrentUser, hashPassword } from '@/lib/auth';
 import { withApiErrors } from '@/lib/apiError';
 import { EMAIL_RE } from '@/lib/usersServer';
 
-// Edit an account you created: name, email, and (optionally) reset its password.
+// Edit an account you created — or, as an admin, any account that isn't
+// another admin's: name, email, and (optionally) reset its password.
 export const PATCH = withApiErrors(async (request, { params }) => {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const target = (await query('SELECT id, name, email, created_by FROM users WHERE id = ?', [params.id]))[0];
-  if (!target || target.created_by !== user.id) {
+  if (user.impersonator) return NextResponse.json({ error: 'Go back to your own account to edit users.' }, { status: 403 });
+  const target = (await query('SELECT id, name, email, created_by, is_admin FROM users WHERE id = ?', [params.id]))[0];
+  const adminMayEdit = user.is_admin && target && (!target.is_admin || target.id === user.id);
+  if (!target || (target.created_by !== user.id && !adminMayEdit)) {
     return NextResponse.json({ error: 'You can only edit accounts you created.' }, { status: 403 });
   }
 

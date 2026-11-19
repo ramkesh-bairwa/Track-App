@@ -42,6 +42,13 @@ export const POST = withApiErrors(async (request) => {
     hashed,
   ]);
 
+  // Desktop app: the database starts empty, so whoever sets it up first is its
+  // admin (Screenshots, Users…). The web app keeps using scripts/make-admin.js.
+  if (process.env.MYTRACK_DESKTOP === '1') {
+    const [{ n }] = await query('SELECT COUNT(*) AS n FROM users');
+    if (Number(n) === 1) await query('UPDATE users SET is_admin = 1 WHERE id = ?', [result.insertId]);
+  }
+
   const token = await createSessionToken({ sub: String(result.insertId), name, email });
   const response = NextResponse.json({ ok: true });
   response.cookies.set(SESSION_COOKIE, token, {

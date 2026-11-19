@@ -19,6 +19,8 @@ import { NewTrackButton } from '@/components/NewTrackModal';
 import SubtrackViews, { SUBTRACK_VIEWS } from '@/components/SubtrackViews';
 import { fieldTypeMeta, emptyValueFor, optionList } from '@/lib/fieldTypes';
 import ExportMenu from '@/components/ExportMenu';
+import TrackHistory, { TRACK_CHANGED_EVENT } from '@/components/TrackHistory';
+import DeletePasswordOption from '@/components/DeletePasswordOption';
 import { trackExportTable } from '@/lib/trackExport';
 import EntryLayouts from '@/components/EntryLayouts';
 import { TRACK_VIEW_TYPES, normalizeViewType } from '@/lib/trackTypes';
@@ -38,6 +40,9 @@ export default function TrackView({ track, initialColumns, initialEntries, user,
   const [renameColumn, setRenameColumn] = useState(null);
   const [privacyPrompt, setPrivacyPrompt] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [historyEntry, setHistoryEntry] = useState(null); // record shown in the history under the table
+  // "Ask for my password before deleting" — can be turned on from any delete dialog.
+  const [deletePw, setDeletePw] = useState({ required: Boolean(user?.require_password_delete), hasPassword: Boolean(user?.has_action_password) });
   const [trackName, setTrackName] = useState(track.name);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(track.name);
@@ -166,6 +171,54 @@ export default function TrackView({ track, initialColumns, initialEntries, user,
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   }
 
+  // Something was saved (records, columns, name…) → tell an open History.
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return undefined;
+    }
+    const t = setTimeout(() => window.dispatchEvent(new Event(TRACK_CHANGED_EVENT)), 300);
+    return () => clearTimeout(t);
+  }, [entries, columns, trackName, pageSize, showSerial, viewType]);
+
+  // Opening a record's details is logged in its history (at most every 10 min).
+  const viewedId = viewEntry?.id;
+  useEffect(() => {
+    if (viewedId) fetch(`/api/tracks/${track.id}/entries/${viewedId}/view`, { method: 'POST' }).catch(() => {});
+  }, [viewedId, track.id]);
+
+  function entryTitle(entry) {
+    for (const col of columns) {
+      const input = fieldTypeMeta(col.field_type).input;
+      if (col.is_auto_increment || ['password', 'file', 'checkbox', 'color'].includes(input)) continue;
+      const v = entry.data?.[col.field_key];
+      if (v !== '' && v !== null && v !== undefined) return String(v).slice(0, 80);
+    }
+    return '';
+  }
+
+  // The history sits under the table: switch it to a record (or the whole
+  // track) and scroll down to it.
+  function openHistory(entry) {
+    setHistoryEntry(entry ? { id: entry.id, label: entry.is_locked ? 'locked record' : entryTitle(entry) } : null);
+    setTimeout(() => document.getElementById('track-history')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  }
+
+  // After a revert / restore from the history, reload the records.
+  async function reloadEntries() {
+    try {
+      const res = await fetch(`/api/tracks/${track.id}/entries`);
+      const json = await res.json();
+      if (!res.ok) return;
+      setEntries(
+        json.entries.map((e) => ({ ...e, data: typeof e.data === 'string' ? JSON.parse(e.data) : e.data }))
+      );
+    } catch {
+      // keep what's shown
+    }
+  }
+
   function closeEntry() {
     const params = new URLSearchParams(searchParams.toString());
     params.delete('entry');
@@ -240,12 +293,28 @@ export default function TrackView({ track, initialColumns, initialEntries, user,
     });
   }
 
-  async function guardDelete(action) {
-    if (user?.require_password_delete) {
-      await requirePrivacyPassword('Enter your privacy password to confirm this deletion.');
+  // DELETE with the privacy password when it's required (asked first if we
+  // know it's on; asked and retried if the server says so).
+  async function deleteRequest(url) {
+    const ask = () => requirePrivacyPassword('Enter your privacy password to confirm this deletion.');
+    let pw = deletePw.required ? await ask() : null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const res = await fetch(url, { method: 'DELETE', headers: pw ? { 'X-Privacy-Password': encodeURIComponent(pw) } : undefined });
+      if (res.ok) return res;
+      const json = await res.json().catch(() => ({}));
+      if (res.status === 403 && json.needPassword) {
+        setDeletePw((d) => ({ ...d, required: true, hasPassword: true }));
+        pw = await ask();
+        continue;
+      }
+      throw new Error(json.error || 'Could not delete that.');
     }
-    return action();
+    throw new Error('Incorrect privacy password.');
   }
+
+  const deleteOption = (
+    <DeletePasswordOption required={deletePw.required} hasPassword={deletePw.hasPassword} onChange={setDeletePw} />
+  );
 
   async function guardEdit(action) {
     if (user?.require_password_edit) {
@@ -481,13 +550,11 @@ export default function TrackView({ track, initialColumns, initialEntries, user,
       message: 'Data stored under it will no longer be shown.',
       confirmLabel: 'Remove column',
       danger: true,
-      onConfirm: () =>
-        guardDelete(async () => {
-          const res = await fetch(`/api/tracks/${track.id}/columns/${columnId}`, { method: 'DELETE' });
-          if (res.ok) {
-            setColumns((cols) => cols.filter((c) => c.id !== columnId));
-          }
-        }),
+      extra: true,
+      onConfirm: async () => {
+        await deleteRequest(`/api/tracks/${track.id}/columns/${columnId}`);
+        setColumns((cols) => cols.filter((c) => c.id !== columnId));
+      },
     });
   }
 
@@ -547,14 +614,14 @@ export default function TrackView({ track, initialColumns, initialEntries, user,
   function handleDeleteEntry(entryId) {
     setConfirmState({
       title: 'Delete this entry?',
-      message: 'This cannot be undone.',
+      message: 'You can restore it later from 🕘 History.',
       confirmLabel: 'Delete entry',
       danger: true,
-      onConfirm: () =>
-        guardDelete(async () => {
-          setEntries((rows) => rows.filter((r) => r.id !== entryId));
-          await fetch(`/api/tracks/${track.id}/entries/${entryId}`, { method: 'DELETE' });
-        }),
+      extra: true,
+      onConfirm: async () => {
+        await deleteRequest(`/api/tracks/${track.id}/entries/${entryId}`);
+        setEntries((rows) => rows.filter((r) => r.id !== entryId));
+      },
     });
   }
 
@@ -565,14 +632,14 @@ export default function TrackView({ track, initialColumns, initialEntries, user,
         subtracks && subtracks.length > 0
           ? 'Everything in it — columns, entries, and all its sub-tracks — will be deleted. This cannot be undone.'
           : 'Everything in it — columns and entries — will be deleted. This cannot be undone.',
-      confirmLabel: 'Delete track',
+      confirmLabel: track.parent_id ? 'Delete sub-track' : 'Delete track',
       danger: true,
-      onConfirm: () =>
-        guardDelete(async () => {
-          await fetch(`/api/tracks/${track.id}`, { method: 'DELETE' });
-          router.push('/dashboard');
-          router.refresh();
-        }),
+      extra: true,
+      onConfirm: async () => {
+        await deleteRequest(`/api/tracks/${track.id}`);
+        router.push('/dashboard');
+        router.refresh();
+      },
     });
   }
 
@@ -646,6 +713,7 @@ export default function TrackView({ track, initialColumns, initialEntries, user,
                 : `The ${filteredEntries.length} entries matching your search/filters.`
             }
           />
+          <button className="btn" onClick={() => openHistory(null)} title="Every change to this track, its columns and records">🕘 History</button>
           <button className="btn" onClick={() => setShowSettings(true)} title="Filters, search & pagination">⚙ Settings</button>
           <button className="btn btn-danger" onClick={handleDeleteTrack}>Delete</button>
         </div>
@@ -805,6 +873,7 @@ export default function TrackView({ track, initialColumns, initialEntries, user,
                   onLock: (entry) => handleLockEntry(entry.id),
                   onUnlock: (entry) => handleUnlockEntry(entry),
                   onDelete: (entry) => handleDeleteEntry(entry.id),
+                  onHistory: (entry) => openHistory(entry),
                 }}
               />
             </div>
@@ -955,6 +1024,14 @@ export default function TrackView({ track, initialColumns, initialEntries, user,
                         )}
                         <button
                           type="button"
+                          className="row-action-btn"
+                          onClick={() => openHistory(entry)}
+                          title="History of this record"
+                        >
+                          🕘
+                        </button>
+                        <button
+                          type="button"
                           className="row-action-btn danger"
                           onClick={() => handleDeleteEntry(entry.id)}
                           title="Delete entry"
@@ -1050,6 +1127,13 @@ export default function TrackView({ track, initialColumns, initialEntries, user,
                     )}
                     <button
                       type="button"
+                      className="entry-card-btn"
+                      onClick={(e) => { e.stopPropagation(); openHistory(entry); }}
+                    >
+                      🕘 History
+                    </button>
+                    <button
+                      type="button"
                       className="entry-card-btn entry-card-btn-danger"
                       onClick={(e) => { e.stopPropagation(); handleDeleteEntry(entry.id); }}
                     >
@@ -1088,6 +1172,15 @@ export default function TrackView({ track, initialColumns, initialEntries, user,
         </>
       )}
 
+      <TrackHistory
+        inline
+        track={{ id: track.id, name: trackName }}
+        entry={historyEntry}
+        hasSubtracks={Boolean(subtracks && subtracks.length)}
+        onEntryCleared={() => setHistoryEntry(null)}
+        onRestored={reloadEntries}
+      />
+
       {showAddColumn && (
         <AddColumnModal onClose={() => setShowAddColumn(false)} onCreate={handleCreateColumn} />
       )}
@@ -1117,7 +1210,9 @@ export default function TrackView({ track, initialColumns, initialEntries, user,
         />
       )}
       {confirmState && (
-        <ConfirmModal {...confirmState} onClose={() => setConfirmState(null)} />
+        <ConfirmModal {...confirmState} onClose={() => setConfirmState(null)}>
+          {confirmState.extra ? deleteOption : null}
+        </ConfirmModal>
       )}
       {infoColumn && (
         <ColumnInfoModal column={infoColumn} onClose={() => setInfoColumn(null)} />
@@ -1137,6 +1232,10 @@ export default function TrackView({ track, initialColumns, initialEntries, user,
           serial={serialById.get(viewEntry.id)}
           onClose={closeEntry}
           onEdit={() => openEntry(viewEntry, 'edit')}
+          onHistory={() => {
+            closeEntry();
+            openHistory(viewEntry);
+          }}
         />
       )}
       {editEntry && (
@@ -1151,8 +1250,8 @@ export default function TrackView({ track, initialColumns, initialEntries, user,
       {privacyPrompt && (
         <PrivacyPasswordModal
           message={privacyPrompt.message}
-          onVerified={() => {
-            privacyPrompt.resolve();
+          onVerified={(pw) => {
+            privacyPrompt.resolve(pw);
             setPrivacyPrompt(null);
           }}
           onCancel={() => {

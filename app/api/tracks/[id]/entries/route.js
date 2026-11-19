@@ -4,6 +4,7 @@ import { query } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { emptyValueFor, sanitizeEntryValue } from '@/lib/fieldTypes';
 import { withApiErrors } from '@/lib/apiError';
+import { logTrack, trackColumns, entryFacts, entryLabel } from '@/lib/trackLog';
 
 async function assertOwnership(trackId, userId) {
   const rows = await query('SELECT id FROM tracks WHERE id = ? AND user_id = ?', [trackId, userId]);
@@ -36,6 +37,7 @@ export const PATCH = withApiErrors(async (request, { params }) => {
   }
   const body = await request.json().catch(() => ({}));
   const order = Array.isArray(body.order) ? body.order : [];
+  const before = await query('SELECT id FROM track_entries WHERE track_id = ? ORDER BY position ASC, id ASC', [trackId]);
   await Promise.all(
     order.map((entryId, index) =>
       query('UPDATE track_entries SET position = ? WHERE id = ? AND track_id = ?', [
@@ -45,6 +47,10 @@ export const PATCH = withApiErrors(async (request, { params }) => {
       ])
     )
   );
+  const moved = order.map(Number).filter((id, i) => before[i]?.id !== id).length;
+  if (moved) {
+    await logTrack({ trackId, user, action: 'entry_reorder', summary: `Reordered records (${moved} moved)` });
+  }
   return NextResponse.json({ ok: true });
 });
 
@@ -87,5 +93,15 @@ export const POST = withApiErrors(async (request, { params }) => {
   );
 
   const rows = await query('SELECT * FROM track_entries WHERE id = ?', [result.insertId]);
+  const cols = await trackColumns(trackId);
+  const label = entryLabel(cols, data);
+  await logTrack({
+    trackId,
+    user,
+    action: 'entry_create',
+    summary: label ? `Added record “${label}”` : 'Added a record',
+    entry: { id: rows[0].id, uuid: rows[0].uuid, label },
+    changes: entryFacts(cols, data),
+  });
   return NextResponse.json({ ok: true, entry: rows[0] });
 });
