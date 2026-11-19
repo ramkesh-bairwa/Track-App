@@ -51,7 +51,9 @@ export default function DownloadPage() {
           cta="Download .dmg"
           steps={[
             'Open the .dmg and drag MyTrack to Applications.',
-            'First launch: right-click MyTrack → Open → Open (it’s unsigned).',
+            'Double-click MyTrack. macOS says it “could not verify” the app (it isn’t from the App Store) — click Done.',
+            'Open System Settings → Privacy & Security, scroll down, and click “Open Anyway” next to MyTrack, then Open.',
+            'Fastest alternative: in Terminal run  xattr -dr com.apple.quarantine /Applications/MyTrack.app  then open it normally.',
           ]}
         />
         <Platform
