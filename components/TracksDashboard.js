@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import TrackCard from '@/components/TrackCard';
 import { NewTrackButton } from '@/components/NewTrackModal';
+import TrackHistory from '@/components/TrackHistory';
 
 function pathLabel(byId, track) {
   const parts = [];
@@ -33,6 +34,13 @@ export default function TracksDashboard({ tracks }) {
           <p>Every track you keep, and what you've logged in it.</p>
         </div>
         <div className="page-head-actions">
+          <button
+            className="btn"
+            onClick={() => document.getElementById('track-history')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            title="Everything done in any track or sub-track, deleted ones included"
+          >
+            🕘 All history
+          </button>
           <NewTrackButton className="btn btn-primary">＋ New track</NewTrackButton>
         </div>
       </div>
@@ -65,6 +73,8 @@ export default function TracksDashboard({ tracks }) {
           ))}
         </div>
       )}
+
+      <TrackHistory inline track={null} />
     </>
   );
 }

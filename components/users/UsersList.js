@@ -54,7 +54,7 @@ export default function UsersList({ users, isAdmin }) {
       <div className="page-head">
         <div>
           <h1>Users</h1>
-          <p>{isAdmin ? 'Every account. As an admin you can make other people admins.' : 'People you created accounts for, and everyone who shares a task board with you.'}</p>
+          <p>{isAdmin ? 'Every account. Manage opens a person’s desktop apps, screenshots, system photos and activity, and lets you open MyTrack as them.' : 'People you created accounts for, and everyone who shares a task board with you.'}</p>
         </div>
         <div className="page-head-actions">
           <ExportMenu
@@ -107,7 +107,7 @@ export default function UsersList({ users, isAdmin }) {
             </thead>
             <tbody>
               {shown.map((u) => (
-                <tr key={u.id} onDoubleClick={() => u.managed && setEditing(u)}>
+                <tr key={u.id} onDoubleClick={() => (isAdmin ? router.push(`/dashboard/users/${u.id}`) : u.managed && setEditing(u))}>
                   <td>
                     <span className="task-assignee">
                       <Avatar person={u} size={26} />
@@ -139,7 +139,14 @@ export default function UsersList({ users, isAdmin }) {
                     </td>
                   )}
                   <td>
-                    {u.managed ? (
+                    {isAdmin ? (
+                      <span className="user-admin-actions">
+                        <Link href={`/dashboard/users/${u.id}`} className="btn btn-sm btn-primary">Manage</Link>
+                        {(!u.is_admin || u.managed) && (
+                          <button type="button" className="btn btn-sm" onClick={() => setEditing(u)}>✎ Edit</button>
+                        )}
+                      </span>
+                    ) : u.managed ? (
                       <button type="button" className="btn btn-sm" onClick={() => setEditing(u)}>✎ Edit</button>
                     ) : (
                       <span className="task-muted" style={{ fontSize: 12 }} title="Only the person themselves, or whoever created it, can change this account">{u.created_by ? 'Created by someone else' : 'Registered themselves'}</span>

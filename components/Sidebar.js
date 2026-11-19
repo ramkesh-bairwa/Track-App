@@ -401,6 +401,15 @@ export default function Sidebar({ user, tracks }) {
           <span>Activity</span>
         </Link>
       )}
+      {menuShown(user, 'testing') && (
+        <Link
+          href="/dashboard/testing"
+          className={`sidebar-tasks-link${pathname.startsWith('/dashboard/testing') ? ' active' : ''}`}
+        >
+          <i className="fa-solid fa-vial-circle-check" />
+          <span>Testing feedback</span>
+        </Link>
+      )}
       {user?.is_admin && menuShown(user, 'screenshots') && (
         <Link
           href="/dashboard/screenshots"
