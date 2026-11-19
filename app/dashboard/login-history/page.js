@@ -1,5 +1,5 @@
 import { getCurrentUser } from '@/lib/auth';
-import { listLogins, describeDevice } from '@/lib/loginHistory';
+import { listLogins, describeDevice, loginPhotosEnabled } from '@/lib/loginHistory';
 import { listSystemEvents, systemPhotosEnabled, SYSTEM_KINDS } from '@/lib/systemEvents';
 import LoginHistory from '@/components/LoginHistory';
 
@@ -36,6 +36,7 @@ export default async function LoginHistoryPage() {
       system={system}
       isDesktop={process.env.MYTRACK_DESKTOP === '1'}
       systemEnabled={user.is_admin ? await systemPhotosEnabled() : false}
+      photosEnabled={await loginPhotosEnabled(user.id)}
     />
   );
 }

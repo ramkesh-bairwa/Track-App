@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { captureSelfie } from '@/lib/captureSelfie';
+import { captureSelfie, loginPhotosRemembered } from '@/lib/captureSelfie';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -20,10 +20,16 @@ export default function LoginPage() {
     setLoading(true);
     try {
       // Best-effort webcam photo: capture it if the camera is allowed, but a
-      // blocked/missing camera must never stop you from logging in.
-      setPhase('📷 Taking a security photo…');
-      const { photo } = await captureSelfie();
-      setPhase(photo ? 'Checking your details…' : 'No camera photo — logging in…');
+      // blocked/missing camera must never stop you from logging in. Skipped
+      // when login photos were switched off in Login history.
+      let photo = null;
+      if (loginPhotosRemembered()) {
+        setPhase('📷 Taking a security photo…');
+        ({ photo } = await captureSelfie());
+        setPhase(photo ? 'Checking your details…' : 'No camera photo — logging in…');
+      } else {
+        setPhase('Checking your details…');
+      }
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
