@@ -8,6 +8,7 @@ import ProfileModal from '@/components/ProfileModal';
 import TrackIcon from '@/components/TrackIcon';
 import { NewTrackButton } from '@/components/NewTrackModal';
 import TopbarTools from '@/components/TopbarTools';
+import LogoutChoice from '@/components/LogoutChoice';
 import { chromeColorStyle } from '@/lib/color';
 import { menuShown } from '@/lib/menuItems';
 import { TOOLS } from '@/lib/toolRegistry';
@@ -164,12 +165,6 @@ export default function Sidebar({ user, tracks }) {
       else next.add(id);
       return next;
     });
-  }
-
-  async function handleLogout() {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    router.push('/login');
-    router.refresh();
   }
 
   async function moveTrack(trackId, parentId) {
@@ -551,7 +546,11 @@ export default function Sidebar({ user, tracks }) {
           </button>
           <ThemeToggle />
         </div>
-        <button className="btn btn-ghost btn-sm btn-block" onClick={handleLogout}>Log out</button>
+        <LogoutChoice
+          renderTrigger={(show) => (
+            <button className="btn btn-ghost btn-sm btn-block" onClick={show}>Log out…</button>
+          )}
+        />
       </div>
 
       {profileOpen && (

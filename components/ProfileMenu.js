@@ -12,6 +12,7 @@ import DataTransferModal from '@/components/DataTransferModal';
 import AppLockModal from '@/components/AppLockModal';
 import SyncModal from '@/components/SyncModal';
 import ServerConnectionModal from '@/components/ServerConnectionModal';
+import { LogoutChoiceModal } from '@/components/LogoutChoice';
 
 export default function ProfileMenu({ user, desktop = false }) {
   const router = useRouter();
@@ -26,6 +27,7 @@ export default function ProfileMenu({ user, desktop = false }) {
   const [showAppLock, setShowAppLock] = useState(false);
   const [showSync, setShowSync] = useState(false);
   const [showServer, setShowServer] = useState(false);
+  const [showLogout, setShowLogout] = useState(false);
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -36,12 +38,6 @@ export default function ProfileMenu({ user, desktop = false }) {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [open]);
-
-  async function handleLogout() {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    router.push('/login');
-    router.refresh();
-  }
 
   const initials = (currentUser?.name || '?').trim().slice(0, 1).toUpperCase();
 
@@ -181,15 +177,18 @@ export default function ProfileMenu({ user, desktop = false }) {
           <button
             type="button"
             className="profile-menu-item profile-menu-item-danger"
-            onClick={handleLogout}
+            onClick={() => {
+              setOpen(false);
+              setShowLogout(true);
+            }}
           >
-            Log out
+            Log out…
           </button>
         </div>
       )}
 
       {/* Rendered at the page root, so the top bar's own color settings don't leak into them. */}
-      {(showProfile || showPrivacy || showAccessibility || showBackup || showAppearance || showData || showAppLock || showSync || showServer) &&
+      {(showProfile || showPrivacy || showAccessibility || showBackup || showAppearance || showData || showAppLock || showSync || showServer || showLogout) &&
         createPortal(
           <>
             {showProfile && (
@@ -218,6 +217,7 @@ export default function ProfileMenu({ user, desktop = false }) {
             {showAppLock && <AppLockModal onClose={() => setShowAppLock(false)} />}
             {showSync && <SyncModal onClose={() => setShowSync(false)} />}
             {showServer && <ServerConnectionModal user={currentUser} onClose={() => setShowServer(false)} />}
+            {showLogout && <LogoutChoiceModal onClose={() => setShowLogout(false)} />}
             {showAppearance && (
               <AppearanceModal
                 user={currentUser}
