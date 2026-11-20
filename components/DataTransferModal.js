@@ -1,119 +1,90 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 
-// Profile menu → "Export / import data". Export downloads the chosen modules
-// as one JSON file; import reads such a file (e.g. exported locally) and adds
-// the chosen modules to this account. Nothing already here is overwritten.
-
-const LABELS = {
+const TABLE_LABELS = {
+  tracks: 'Tracks & sub-tracks',
+  track_entries: 'Records',
   notes: 'Notes',
-  tracks: 'Tracks (records)',
-  tasks: 'Task boards',
-  code: 'Saved code',
-  calendar: 'Calendar (leaves & activities)',
-  expenses: 'Expenses',
-  routine: 'Daily routine',
+  code_snippets: 'Saved code',
+  calendar_activities: 'Calendar activities',
+  calendar_leaves: 'Leaves',
+  user_devices: 'Devices',
+  test_projects: 'Testing projects',
+  task_boards: 'Task boards',
+  tasks: 'Tasks',
+  user_activity: 'Activity log',
+  track_activity: 'Track history',
 };
 
-// What a module in an export file holds, for the "found in this file" list.
-function fileCount(key, data) {
-  if (!data) return 0;
-  const n = (v) => (Array.isArray(v) ? v.length : 0);
-  switch (key) {
-    case 'tracks':
-      return `${n(data.tracks)} track${n(data.tracks) === 1 ? '' : 's'}, ${n(data.entries)} record${n(data.entries) === 1 ? '' : 's'}`;
-    case 'tasks':
-      return `${n(data.boards)} board${n(data.boards) === 1 ? '' : 's'}, ${n(data.tasks)} task${n(data.tasks) === 1 ? '' : 's'}`;
-    case 'code':
-      return n(data.snippets);
-    case 'calendar':
-      return n(data.leaves) + n(data.activities);
-    case 'routine':
-      return n(data.items);
-    default:
-      return n(data);
+async function downloadExport(options) {
+  const res = await fetch(`/api/data-transfer/export${options ? `?${new URLSearchParams(options)}` : ''}`);
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    throw new Error(json.error || 'Could not export your data.');
   }
+  const blob = await res.blob();
+  const name = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') || '')?.[1] || 'mytrack-data.json';
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function ModuleList({ items, selected, onToggle, disabled }) {
+const EXPORT_FORMATS = [
+  { id: 'xlsx', label: 'Excel', hint: '.xlsx — one tab per track and per table' },
+  { id: 'json', label: 'JSON', hint: '.json — can be imported back here' },
+  { id: 'sql', label: 'SQL', hint: '.sql — load into MySQL / MariaDB' },
+];
+
+function exportNote(format, content, scope) {
+  if (content === 'empty') {
+    if (format === 'sql') return 'CREATE TABLE statements for every table — run it to set up a new, empty MyTrack database.';
+    if (format === 'json') return 'Every table with its columns and types, no rows.';
+    return 'A Summary tab listing every table and its columns, plus one empty tab per table with its column headings.';
+  }
+  const who = scope === 'all' ? 'every user’s data' : 'your data';
+  if (format === 'sql') return `The table structure plus INSERT statements for ${who}.${scope === 'all' ? ' Loading it replaces the tables in the target database.' : ''}`;
+  if (format === 'json') return scope === 'all' ? 'Every table and row of the database.' : 'Use “Import” below (here or in the other app) to load this file.';
+  return `Easy-to-read tabs for each track’s records, then one tab per table with ${who}. Passwords and tokens are hidden.`;
+}
+
+function Counts({ tables }) {
+  const rows = Object.entries(TABLE_LABELS).filter(([t]) => tables?.[t]);
+  if (rows.length === 0) return <p className="field-hint">Nothing in it.</p>;
   return (
-    <div className="data-module-list">
-      {items.map((m) => (
-        <label key={m.key} className={`data-module${m.empty ? ' is-empty' : ''}`}>
-          <input type="checkbox" checked={selected.includes(m.key)} disabled={disabled} onChange={() => onToggle(m.key)} />
-          <span className="data-module-label">{m.label}</span>
-          <span className="data-module-count">{m.count}</span>
-        </label>
+    <ul className="data-transfer-counts">
+      {rows.map(([t, label]) => (
+        <li key={t}>
+          <span>{label}</span>
+          <strong>{tables[t]}</strong>
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
 
-export default function DataTransferModal({ onClose }) {
-  const router = useRouter();
-  const [tab, setTab] = useState('export');
-  const [error, setError] = useState('');
-
-  // export
-  const [summary, setSummary] = useState(null);
-  const [exportSel, setExportSel] = useState([]);
+// Export this account's data to a file, or import one made by the website
+// or the desktop app.
+export default function DataTransferModal({ user, onClose }) {
   const [exporting, setExporting] = useState(false);
-
-  // import
-  const [file, setFile] = useState(null); // { name, data }
-  const [importSel, setImportSel] = useState([]);
+  const [format, setFormat] = useState('xlsx');
+  const [content, setContent] = useState('data');
+  const [scope, setScope] = useState('mine');
+  const [file, setFile] = useState(null); // { name, data, counts }
+  const [mode, setMode] = useState('merge');
+  const [usePassword, setUsePassword] = useState(false);
   const [importing, setImporting] = useState(false);
-  const [updateExisting, setUpdateExisting] = useState(true);
-  const [results, setResults] = useState(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch('/api/data/summary')
-      .then((res) => res.json())
-      .then((json) => {
-        if (cancelled) return;
-        if (!json.modules) throw new Error();
-        setSummary(json.modules);
-        // Pre-tick everything that has data (or whose count couldn't be read).
-        const withData = json.modules.filter((m) => m.count !== 0 && !m.unavailable).map((m) => m.key);
-        setExportSel(withData.length ? withData : json.modules.map((m) => m.key));
-      })
-      .catch(() => {
-        if (cancelled) return;
-        // Couldn't count — still offer every module so export keeps working.
-        const all = Object.entries(LABELS).map(([key, label]) => ({ key, label, count: null }));
-        setSummary(all);
-        setExportSel(all.map((m) => m.key));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const toggle = (setter) => (key) => setter((sel) => (sel.includes(key) ? sel.filter((k) => k !== key) : [...sel, key]));
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState('');
 
   async function handleExport() {
     setExporting(true);
     setError('');
     try {
-      const res = await fetch(`/api/data/export?modules=${exportSel.join(',')}`);
-      if (!res.ok) {
-        const json = await res.json().catch(() => ({}));
-        throw new Error(json.error || 'Export failed.');
-      }
-      const skipped = res.headers.get('X-Skipped-Modules');
-      if (skipped) setError(`Exported, but couldn't read: ${skipped.split(',').map((k) => LABELS[k] || k).join(', ')}.`);
-      const name = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') || '')?.[1] || 'mytrack-export.json';
-      const url = URL.createObjectURL(await res.blob());
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = name;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      await downloadExport({ format, content, scope });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -121,36 +92,43 @@ export default function DataTransferModal({ onClose }) {
     }
   }
 
-  async function handleFile(e) {
-    const f = e.target.files?.[0];
+  async function pickFile(e) {
+    const picked = e.target.files?.[0];
     e.target.value = '';
-    setResults(null);
+    setResult(null);
     setError('');
-    if (!f) return;
+    if (!picked) return;
     try {
-      const data = JSON.parse(await f.text());
-      if (data?.format !== 'mytrack-data' || typeof data.modules !== 'object') throw new Error();
-      setFile({ name: f.name, data });
-      setImportSel(Object.keys(data.modules).filter((k) => LABELS[k]));
+      const data = JSON.parse(await picked.text());
+      if (data?.format !== 'mytrack-export') throw new Error();
+      const counts = Object.fromEntries(Object.entries(data.tables || {}).map(([t, rows]) => [t, rows.length]));
+      setFile({ name: picked.name, data, counts });
     } catch {
       setFile(null);
-      setError('That file is not a MyTrack export. Export it from Profile → Export / import data first.');
+      setError('That file is not a MyTrack export.');
     }
   }
 
   async function handleImport() {
+    if (mode === 'replace') {
+      const ok = window.confirm(
+        'Replace all your data in this app with the file’s data?\n\nA copy of your current data downloads first, so you can bring it back.'
+      );
+      if (!ok) return;
+    }
     setImporting(true);
     setError('');
     try {
-      const res = await fetch('/api/data/import', {
+      if (mode === 'replace') await downloadExport();
+      const res = await fetch('/api/data-transfer/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file: file.data, modules: importSel, update: updateExisting }),
+        body: JSON.stringify({ mode, usePassword, data: file.data }),
       });
       const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error || 'Import failed — nothing was changed.');
-      setResults(json.results);
-      router.refresh();
+      if (!res.ok) throw new Error(json.error || 'Import failed.');
+      setResult(json);
+      setFile(null);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -158,104 +136,152 @@ export default function DataTransferModal({ onClose }) {
     }
   }
 
-  const exportItems = (summary || []).map((m) => ({
-    ...m,
-    empty: m.count === 0,
-    count: m.unavailable ? 'not available' : m.count == null ? '' : m.count,
-  }));
-  const importItems = file
-    ? Object.keys(file.data.modules)
-        .filter((k) => LABELS[k])
-        .map((k) => ({ key: k, label: LABELS[k], count: fileCount(k, file.data.modules[k]) }))
-    : [];
+  const otherAccount = file && file.data.account?.email && file.data.account.email.toLowerCase() !== String(user?.email).toLowerCase();
 
   return (
-    <div className="modal-overlay" onClick={exporting || importing ? undefined : onClose}>
+    <div className="modal-overlay" onClick={importing ? undefined : onClose}>
       <div className="modal data-transfer-modal" onClick={(e) => e.stopPropagation()}>
-        <h2>Export / import data</h2>
-        <p className="field-hint" style={{ marginBottom: 12 }}>
-          Move your data between MyTrack sites — export it here, then import the file on the other site (for example local → live).
+        <h2>Import / export data</h2>
+        <p className="field-hint" style={{ marginBottom: 16 }}>
+          Move your data between the MyTrack website and the desktop app. Export it here, then import the file in the other one.
         </p>
 
-        <div className="tabs" role="tablist" style={{ marginBottom: 14 }}>
-          <button type="button" role="tab" aria-selected={tab === 'export'} className={`tab-btn${tab === 'export' ? ' active' : ''}`} onClick={() => { setTab('export'); setError(''); }}>
-            ⬇ Export
+        <section className="data-transfer-section">
+          <h3>Export</h3>
+          <p className="field-hint">
+            Tracks, records, notes, saved code, calendar, devices, testing projects, your task boards and your history.
+          </p>
+
+          <div className="field-label" style={{ marginTop: 10 }}>Format</div>
+          <div className="task-visibility-options three">
+            {EXPORT_FORMATS.map((f) => (
+              <label key={f.id} className={`task-visibility${format === f.id ? ' selected' : ''}`}>
+                <input type="radio" name="export-format" checked={format === f.id} onChange={() => setFormat(f.id)} />
+                <span>
+                  <strong>{f.label}</strong>
+                  <small>{f.hint}</small>
+                </span>
+              </label>
+            ))}
+          </div>
+
+          <div className="field-label" style={{ marginTop: 10 }}>What to include</div>
+          <div className="task-visibility-options">
+            <label className={`task-visibility${content === 'data' ? ' selected' : ''}`}>
+              <input type="radio" name="export-content" checked={content === 'data'} onChange={() => setContent('data')} />
+              <span>
+                <strong>With data</strong>
+                <small>Every table and all its rows.</small>
+              </span>
+            </label>
+            <label className={`task-visibility${content === 'empty' ? ' selected' : ''}`}>
+              <input type="radio" name="export-content" checked={content === 'empty'} onChange={() => setContent('empty')} />
+              <span>
+                <strong>Empty database</strong>
+                <small>Only the structure — tables and columns, no rows.</small>
+              </span>
+            </label>
+          </div>
+
+          {user?.is_admin && content === 'data' && (
+            <>
+              <div className="field-label" style={{ marginTop: 10 }}>Whose data</div>
+              <div className="task-visibility-options">
+                <label className={`task-visibility${scope === 'mine' ? ' selected' : ''}`}>
+                  <input type="radio" name="export-scope" checked={scope === 'mine'} onChange={() => setScope('mine')} />
+                  <span>
+                    <strong>My data</strong>
+                    <small>Only what this account owns.</small>
+                  </span>
+                </label>
+                <label className={`task-visibility${scope === 'all' ? ' selected' : ''}`}>
+                  <input type="radio" name="export-scope" checked={scope === 'all'} onChange={() => setScope('all')} />
+                  <span>
+                    <strong>Whole database</strong>
+                    <small>Every user’s data (admin only).</small>
+                  </span>
+                </label>
+              </div>
+            </>
+          )}
+
+          <p className="field-hint" style={{ marginTop: 8 }}>{exportNote(format, content, scope)}</p>
+          <button type="button" className="btn btn-primary" onClick={handleExport} disabled={exporting || importing}>
+            {exporting ? 'Exporting…' : `⇩ Download ${EXPORT_FORMATS.find((f) => f.id === format).label}`}
           </button>
-          <button type="button" role="tab" aria-selected={tab === 'import'} className={`tab-btn${tab === 'import' ? ' active' : ''}`} onClick={() => { setTab('import'); setError(''); }}>
-            ⬆ Import
-          </button>
-        </div>
+        </section>
+
+        <section className="data-transfer-section">
+          <h3>Import</h3>
+          <label className="btn">
+            {file ? 'Choose another file…' : 'Choose export file…'}
+            <input type="file" accept=".json,application/json" onChange={pickFile} style={{ display: 'none' }} disabled={importing} />
+          </label>
+
+          {file && (
+            <div className="data-transfer-preview">
+              <p className="field-hint">
+                <strong>{file.name}</strong> — exported {new Date(file.data.exported_at).toLocaleString()}
+                {file.data.account?.email ? ` from ${file.data.account.email}` : ''}
+              </p>
+              {otherAccount && (
+                <p className="field-hint" style={{ color: 'var(--danger)' }}>
+                  This file is from a different account. Its data will be added to yours ({user.email}).
+                </p>
+              )}
+              <Counts tables={file.counts} />
+
+              <div className="task-visibility-options" style={{ marginTop: 12 }}>
+                <label className={`task-visibility${mode === 'merge' ? ' selected' : ''}`}>
+                  <input type="radio" checked={mode === 'merge'} onChange={() => setMode('merge')} />
+                  <span>
+                    <strong>Add as copies</strong>
+                    <span className="field-hint" style={{ display: 'block' }}>Keeps what’s here and adds the file’s data next to it.</span>
+                  </span>
+                </label>
+                <label className={`task-visibility${mode === 'replace' ? ' selected' : ''}`}>
+                  <input type="radio" checked={mode === 'replace'} onChange={() => setMode('replace')} />
+                  <span>
+                    <strong>Replace my data</strong>
+                    <span className="field-hint" style={{ display: 'block' }}>Makes this app match the file exactly. Your current data downloads first.</span>
+                  </span>
+                </label>
+              </div>
+
+              {file.data.account?.password && (
+                <label className="checkbox-row" style={{ marginTop: 10 }}>
+                  <input type="checkbox" checked={usePassword} onChange={(e) => setUsePassword(e.target.checked)} />
+                  <span style={{ fontSize: 13 }}>Also use the password, privacy password and profile settings from the file</span>
+                </label>
+              )}
+
+              <div className="modal-actions">
+                <button type="button" className="btn btn-primary" onClick={handleImport} disabled={importing}>
+                  {importing ? 'Importing…' : mode === 'replace' ? 'Replace my data' : 'Import'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {result && (
+            <div className="task-notice" style={{ marginTop: 12 }}>
+              Imported. <Counts tables={result.added} />
+              {result.peopleCreated?.length > 0 && (
+                <p className="field-hint">
+                  Created accounts for board members who weren’t here yet: {result.peopleCreated.join(', ')}. Set their passwords from the Users page.
+                </p>
+              )}
+              {result.passwordCopied && <p className="field-hint">Your password now matches the one in the file.</p>}
+              <button type="button" className="btn btn-sm" onClick={() => window.location.reload()}>Reload to see it</button>
+            </div>
+          )}
+        </section>
 
         {error && <div className="top-error">{error}</div>}
 
-        {tab === 'export' && (
-          <>
-            {!summary ? (
-              <p className="field-hint">Loading…</p>
-            ) : (
-              <ModuleList items={exportItems} selected={exportSel} onToggle={toggle(setExportSel)} disabled={exporting} />
-            )}
-            <div className="modal-actions">
-              <button type="button" className="btn btn-ghost" onClick={onClose} disabled={exporting}>Close</button>
-              <button type="button" className="btn btn-primary" onClick={handleExport} disabled={exporting || !exportSel.length}>
-                {exporting ? 'Exporting…' : `Download ${exportSel.length === exportItems.length ? 'everything' : 'selected'}`}
-              </button>
-            </div>
-          </>
-        )}
-
-        {tab === 'import' && (
-          <>
-            <label className="data-file-pick">
-              <input type="file" accept="application/json,.json" onChange={handleFile} disabled={importing} />
-              <span className="btn">📂 Choose export file…</span>
-              <span className="data-file-name">{file ? file.name : 'No file chosen'}</span>
-            </label>
-
-            {file && !results && (
-              <>
-                <p className="field-hint" style={{ margin: '12px 0 8px' }}>
-                  Found in this file{file.data.exported_from ? ` (from ${file.data.exported_from})` : ''} — pick what to add to this account:
-                </p>
-                <ModuleList items={importItems} selected={importSel} onToggle={toggle(setImportSel)} disabled={importing} />
-                <label className="data-update-toggle">
-                  <input type="checkbox" checked={updateExisting} disabled={importing} onChange={(e) => setUpdateExisting(e.target.checked)} />
-                  <span>
-                    Update items imported before with this file&apos;s version
-                    <small className="field-hint">
-                      New items are always added. Anything not in the file is left alone, and an item you edited here more recently keeps your newer version.
-                    </small>
-                  </span>
-                </label>
-              </>
-            )}
-
-            {results && (
-              <div className="data-results">
-                {results.map((r) => (
-                  <div key={r.key} className="backup-result-row ok">
-                    <span>✓</span>
-                    <span>
-                      <strong>{r.label}:</strong> {r.summary}
-                      {r.detail ? ` · ${r.detail}` : ''}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="modal-actions">
-              <button type="button" className="btn btn-ghost" onClick={onClose} disabled={importing}>
-                {results ? 'Done' : 'Close'}
-              </button>
-              {file && !results && (
-                <button type="button" className="btn btn-primary" onClick={handleImport} disabled={importing || !importSel.length}>
-                  {importing ? 'Importing…' : 'Import selected'}
-                </button>
-              )}
-            </div>
-          </>
-        )}
+        <div className="modal-actions">
+          <button type="button" className="btn btn-ghost" onClick={onClose} disabled={importing}>Close</button>
+        </div>
       </div>
     </div>
   );

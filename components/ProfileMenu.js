@@ -214,7 +214,7 @@ export default function ProfileMenu({ user, desktop = false }) {
               />
             )}
             {showBackup && <BackupModal user={currentUser} onClose={() => setShowBackup(false)} />}
-            {showData && <DataTransferModal onClose={() => setShowData(false)} />}
+            {showData && <DataTransferModal user={currentUser} onClose={() => setShowData(false)} />}
             {showAppLock && <AppLockModal onClose={() => setShowAppLock(false)} />}
             {showSync && <SyncModal onClose={() => setShowSync(false)} />}
             {showServer && <ServerConnectionModal user={currentUser} onClose={() => setShowServer(false)} />}
