@@ -166,7 +166,8 @@ export default function DataTransferModal({ user, onClose }) {
     }
   }
 
-  const otherAccount = file && file.data.account?.email && file.data.account.email.toLowerCase() !== String(user?.email).toLowerCase();
+  const otherAccount =
+    file && !file.isSql && file.data?.account?.email && file.data.account.email.toLowerCase() !== String(user?.email).toLowerCase();
 
   return (
     <div className="modal-overlay" onClick={importing ? undefined : onClose}>
