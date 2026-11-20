@@ -7,7 +7,7 @@ const fs = require('fs');
 for (const l of fs.readFileSync('.env', 'utf8').split('\n')) { const m = l.trim().match(/^([^#=]+)=(.*)$/); if (m && !(m[1].trim() in process.env)) process.env[m[1].trim()] = m[2].trim(); }
 const mysql = require('mysql2/promise');
 
-const NEW_TABLES = ['desktop_devices','shared_screenshots','sync_keys','sync_state','sync_tombstones','system_events','test_feedback','test_projects','track_activity'];
+const NEW_TABLES = ['desktop_devices','shared_screenshots','sync_keys','sync_state','sync_tombstones','system_events','test_feedback','test_projects','track_activity','attendance'];
 
 function extractCreate(sql, name) {
   const re = new RegExp('CREATE TABLE IF NOT EXISTS\\s+`?' + name + '`?\\s*\\(', 'i');

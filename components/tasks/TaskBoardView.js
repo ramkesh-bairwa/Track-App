@@ -21,6 +21,25 @@ import { taskBoardExportTable } from '@/lib/taskExport';
 // Inline editors rendered by renderCell itself (custom columns use ColumnInput).
 const BUILTIN_EDIT_KEYS = new Set(['title', 'priority', 'assignee', 'due']);
 
+// Assignee <option>s for the table's dropdowns: the board's people, then
+// (site admin running the board) every other account, added on assign.
+function AssigneeOptions({ people, otherUsers, me }) {
+  const members = people.map((p) => (
+    <option key={p.id} value={p.id}>{p.id === me.id ? 'You' : p.name}</option>
+  ));
+  if (otherUsers.length === 0) return members;
+  return (
+    <>
+      <optgroup label="On this board">{members}</optgroup>
+      <optgroup label="All other users — added to this board">
+        {otherUsers.map((u) => (
+          <option key={u.id} value={u.id}>{u.name} — {u.email}</option>
+        ))}
+      </optgroup>
+    </>
+  );
+}
+
 function blankDraft(board) {
   return { title: '', description: '', status: board.statuses[0]?.name, priority: 'Medium', assignee_id: '', due_date: '', data: {} };
 }
@@ -72,6 +91,7 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
   const [commentPrompt, setCommentPrompt] = useState(null); // { activityId, title } after a save
 
   const { board, access, columns, people, tasks } = data;
+  const otherUsers = data.otherUsers || [];
   const base = `/api/task-boards/${board.uuid}`;
 
   const reload = useCallback(async () => {
@@ -238,6 +258,7 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
     setDraftSaving(true);
     setError('');
     try {
+      if (draft.assignee_id !== '') await ensureMember(Number(draft.assignee_id));
       const created = await api(`${base}/tasks`, 'POST', {
         ...draft,
         title: draft.title.trim(),
@@ -342,6 +363,16 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
     const result = await api(`${base}/members`, 'POST', values);
     await reload();
     return result;
+  }
+
+  // Site admin assigned a task to someone not on the board: add their
+  // existing account as a member (no extra rights) before the task is saved.
+  async function addMember(person) {
+    await api(`${base}/members`, 'POST', { email: person.email });
+  }
+  async function ensureMember(id) {
+    const outsider = otherUsers.find((u) => u.id === id);
+    if (outsider) await addMember(outsider);
   }
 
   async function quickStatus(task, status) {
@@ -464,6 +495,7 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
     cancelEdit();
     setData((d) => ({ ...d, tasks: d.tasks.map((x) => (x.id === task.id ? { ...x, ...optimistic } : x)) }));
     try {
+      if (patch.assignee_id) await ensureMember(patch.assignee_id);
       askForComment(await api(`${base}/tasks/${task.id}`, 'PATCH', patch), optimistic.title || task.title);
     } catch (err) {
       setError(err.message);
@@ -559,9 +591,7 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
             {isEditing(t, 'assignee') ? (
               <select className="input input-sm" defaultValue={t.assignee_id ?? ''} autoFocus onChange={(e) => commitCell(t, 'assignee', e.target.value)} onBlur={cancelEdit} onKeyDown={escKey}>
                 <option value="">Unassigned</option>
-                {people.map((p) => (
-                  <option key={p.id} value={p.id}>{p.id === me.id ? 'You' : p.name}</option>
-                ))}
+                <AssigneeOptions people={people} otherUsers={otherUsers} me={me} />
               </select>
             ) : (
               <span className="task-lift">
@@ -674,9 +704,7 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
         return (
           <select className="input input-sm" value={draft.assignee_id} onChange={(e) => set('assignee_id', e.target.value)}>
             <option value="">Unassigned</option>
-            {people.map((p) => (
-              <option key={p.id} value={p.id}>{p.id === me.id ? 'You' : p.name}</option>
-            ))}
+            <AssigneeOptions people={people} otherUsers={otherUsers} me={me} />
           </select>
         );
       case 'due':
@@ -981,6 +1009,8 @@ export default function TaskBoardView({ initial, me, startWithImport = false }) 
           board={board}
           columns={columns}
           people={people}
+          otherUsers={data.otherUsers || []}
+          onAddMember={addMember}
           task={modal.task}
           initial={modal.initial}
           readOnly={modal.mode === 'view'}

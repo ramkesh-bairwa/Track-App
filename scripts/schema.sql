@@ -1300,3 +1300,17 @@ ALTER TABLE track_activity ADD UNIQUE INDEX IF NOT EXISTS uq_track_activity_sync
 ALTER TABLE track_activity ADD INDEX IF NOT EXISTS idx_track_activity_sync_at (sync_at);
 CREATE TRIGGER IF NOT EXISTS trg_track_activity_sync_ins BEFORE INSERT ON track_activity FOR EACH ROW SET NEW.sync_id = IFNULL(NEW.sync_id, UUID());
 CREATE TRIGGER IF NOT EXISTS trg_track_activity_sync_del AFTER DELETE ON track_activity FOR EACH ROW INSERT INTO sync_tombstones (table_name, sync_id) VALUES ('track_activity', OLD.sync_id);
+
+-- Attendance: a user checks in when they start and checks out when they stop.
+-- One row per check-in; check_out stays NULL while they are still checked in.
+-- Timesheet hours are derived from these rows.
+CREATE TABLE IF NOT EXISTS attendance (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  check_in DATETIME NOT NULL,
+  check_out DATETIME NULL,
+  note VARCHAR(500) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_attendance_user (user_id, check_in),
+  CONSTRAINT fk_attendance_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;

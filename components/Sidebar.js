@@ -387,6 +387,15 @@ export default function Sidebar({ user, tracks }) {
           <span>Calendar</span>
         </Link>
       )}
+      {menuShown(user, 'attendance') && (
+        <Link
+          href="/dashboard/attendance"
+          className={`sidebar-tasks-link${pathname.startsWith('/dashboard/attendance') ? ' active' : ''}`}
+        >
+          <i className="fa-solid fa-clock" />
+          <span>Attendance</span>
+        </Link>
+      )}
       {menuShown(user, 'activity') && (
         <Link
           href="/dashboard/activity"

@@ -16,7 +16,7 @@ export const GET = withApiErrors(async (request, { params }) => {
   if (error) return error;
   const id = Number(params.id) || 0;
   const [account] = await query(
-    `SELECT id, name, email, avatar, is_admin, created_at, (app_lock_password IS NOT NULL) AS app_lock,
+    `SELECT id, name, email, avatar, is_admin, created_at, login_photos, (app_lock_password IS NOT NULL) AS app_lock,
             (action_password IS NOT NULL) AS privacy_password FROM users WHERE id = ?`,
     [id]
   );
@@ -49,7 +49,7 @@ export const GET = withApiErrors(async (request, { params }) => {
     owner ? dayCounts(owner) : [],
   ]);
   return NextResponse.json({
-    user: { ...account, is_admin: Boolean(account.is_admin), app_lock: Boolean(account.app_lock), privacy_password: Boolean(account.privacy_password) },
+    user: { ...account, is_admin: Boolean(account.is_admin), login_photos: account.login_photos !== 0, app_lock: Boolean(account.app_lock), privacy_password: Boolean(account.privacy_password) },
     counts,
     devices,
     commands: COMMANDS,

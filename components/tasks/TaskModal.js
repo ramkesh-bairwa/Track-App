@@ -104,7 +104,7 @@ function CollaboratorsInput({ people, assigneeId, value, onChange }) {
 // Add / edit / view a task. `readOnly` shows the same layout without inputs
 // for members who can see a task but not change it. `initial` prefills a new
 // task (e.g. a half-typed quick row moved into the full form).
-export default function TaskModal({ board, columns, people, task, initial, readOnly, onClose, onSave, onShowHistory, onCreateUser, onDelete }) {
+export default function TaskModal({ board, columns, people, otherUsers = [], onAddMember, task, initial, readOnly, onClose, onSave, onShowHistory, onCreateUser, onDelete }) {
   const isNew = !task;
   const [form, setForm] = useState(() => {
     const src = task || initial;
@@ -159,6 +159,8 @@ export default function TaskModal({ board, columns, people, task, initial, readO
     setSaving(true);
     setError('');
     try {
+      const outsider = otherUsers.find((u) => String(u.id) === String(form.assignee_id));
+      if (outsider) await onAddMember(outsider);
       await onSave({
         ...form,
         title: form.title.trim(),
@@ -239,9 +241,24 @@ export default function TaskModal({ board, columns, people, task, initial, readO
                 }}
               >
                 <option value="">Unassigned</option>
-                {people.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}{p.is_admin ? ' (admin)' : ''} — {p.email}</option>
-                ))}
+                {otherUsers.length > 0 ? (
+                  <>
+                    <optgroup label="On this board">
+                      {people.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}{p.is_admin ? ' (admin)' : ''} — {p.email}</option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="All other users — added to this board on save">
+                      {otherUsers.map((u) => (
+                        <option key={u.id} value={u.id}>{u.name} — {u.email}</option>
+                      ))}
+                    </optgroup>
+                  </>
+                ) : (
+                  people.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}{p.is_admin ? ' (admin)' : ''} — {p.email}</option>
+                  ))
+                )}
                 {onCreateUser && <option value="__new__">＋ Create new user…</option>}
               </select>
             </div>

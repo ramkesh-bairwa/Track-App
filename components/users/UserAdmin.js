@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Avatar, formatDateTime } from '@/components/tasks/taskUi';
 import ActivityList from '@/components/activity/ActivityList';
+import AttendanceView from '@/components/attendance/AttendanceView';
+import UserCalendarReview from '@/components/users/UserCalendarReview';
 import UserFormModal from '@/components/users/UserFormModal';
 import './user-admin.css';
 
@@ -135,6 +137,21 @@ export default function UserAdmin({ userId, meId }) {
     setError('');
     try {
       await api(`/api/admin/devices/${device.id}`, { method: 'PATCH', body: JSON.stringify(body) });
+      setNotice(label);
+      setTimeout(() => setNotice(''), 3000);
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function changeUser(body, label) {
+    setBusy(true);
+    setError('');
+    try {
+      await api(`/api/admin/users/${userId}`, { method: 'PATCH', body: JSON.stringify(body) });
       setNotice(label);
       setTimeout(() => setNotice(''), 3000);
       await load();
@@ -284,7 +301,18 @@ export default function UserAdmin({ userId, meId }) {
           )}
         </section>
         <section className="table-panel ua-section">
-          <h2>Sign-ins</h2>
+          <div className="ua-section-head">
+            <h2>Sign-ins</h2>
+            <label className="checkbox-row" title="Take a camera photo when this user signs in, and when MyTrack is opened or unlocked">
+              <input
+                type="checkbox"
+                checked={user.login_photos}
+                disabled={busy}
+                onChange={(e) => changeUser({ login_photos: e.target.checked }, e.target.checked ? 'Login photos on' : 'Login photos off')}
+              />
+              <span>Camera photo on sign-in / unlock</span>
+            </label>
+          </div>
           {logins.length === 0 ? (
             <p className="ua-muted">No sign-ins recorded.</p>
           ) : (
@@ -311,6 +339,16 @@ export default function UserAdmin({ userId, meId }) {
           )}
         </section>
       </div>
+
+      <section className="table-panel ua-section">
+        <h2>Attendance &amp; timesheet</h2>
+        <AttendanceView admin userId={user.id} embedded />
+      </section>
+
+      <section className="table-panel ua-section">
+        <h2>Calendar</h2>
+        <UserCalendarReview userId={user.id} />
+      </section>
 
       <section className="table-panel ua-section">
         <div className="ua-section-head">
