@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import mysql from 'mysql2/promise';
 import { getCurrentUser } from '@/lib/auth';
 import { withApiErrors } from '@/lib/apiError';
+import { applySchemaCompletion } from '@/lib/schemaMigrate';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,7 +39,11 @@ export const POST = withApiErrors(async (request) => {
   });
   try {
     await conn.query(sql);
-    return NextResponse.json({ ok: true });
+    // A restored dump can be older than the running app and so miss columns the
+    // app selects (which would 500 every page). Bring the schema back up to date
+    // without dropping anything. Best-effort — never fails the import.
+    const healed = await applySchemaCompletion(conn, process.env.DB_NAME);
+    return NextResponse.json({ ok: true, healed });
   } catch (err) {
     // Give the real database error back (e.g. a duplicate key on a non-empty DB)
     // instead of a generic 500, so the person knows what to do.
