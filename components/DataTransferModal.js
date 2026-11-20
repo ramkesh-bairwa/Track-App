@@ -98,18 +98,48 @@ export default function DataTransferModal({ user, onClose }) {
     setResult(null);
     setError('');
     if (!picked) return;
+    const text = await picked.text();
+    // A SQL dump (Export → SQL): imported by running it against the database.
+    if (/\.sql$/i.test(picked.name) || (!/\.json$/i.test(picked.name) && !text.trimStart().startsWith('{'))) {
+      setFile({ name: picked.name, sql: text, isSql: true });
+      return;
+    }
     try {
-      const data = JSON.parse(await picked.text());
+      const data = JSON.parse(text);
       if (data?.format !== 'mytrack-export') throw new Error();
       const counts = Object.fromEntries(Object.entries(data.tables || {}).map(([t, rows]) => [t, rows.length]));
       setFile({ name: picked.name, data, counts });
     } catch {
       setFile(null);
-      setError('That file is not a MyTrack export.');
+      setError('That file is not a MyTrack export (.json) or SQL file (.sql).');
     }
   }
 
   async function handleImport() {
+    if (file?.isSql) {
+      const ok = window.confirm(
+        'Run this SQL file against the database?\n\nBest on a new or empty database. If the same data is already here, it may conflict.'
+      );
+      if (!ok) return;
+      setImporting(true);
+      setError('');
+      try {
+        const res = await fetch('/api/data-transfer/import-sql', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sql: file.sql }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json.error || 'SQL import failed.');
+        setResult({ sql: true });
+        setFile(null);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setImporting(false);
+      }
+      return;
+    }
     if (mode === 'replace') {
       const ok = window.confirm(
         'Replace all your data in this app with the file’s data?\n\nA copy of your current data downloads first, so you can bring it back.'
@@ -215,10 +245,27 @@ export default function DataTransferModal({ user, onClose }) {
           <h3>Import</h3>
           <label className="btn">
             {file ? 'Choose another file…' : 'Choose export file…'}
-            <input type="file" accept=".json,application/json" onChange={pickFile} style={{ display: 'none' }} disabled={importing} />
+            <input type="file" accept=".json,application/json,.sql" onChange={pickFile} style={{ display: 'none' }} disabled={importing} />
           </label>
 
-          {file && (
+          {file?.isSql && (
+            <div className="data-transfer-preview">
+              <p className="field-hint">
+                <strong>{file.name}</strong> — SQL file
+              </p>
+              <p className="field-hint" style={{ color: 'var(--warn)' }}>
+                This runs the SQL straight against the database (a restore). Best on a new or empty
+                database — if the same data is already here, it may conflict. Admin only.
+              </p>
+              <div className="modal-actions">
+                <button type="button" className="btn btn-primary" onClick={handleImport} disabled={importing}>
+                  {importing ? 'Running…' : 'Run SQL file'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {file && !file.isSql && (
             <div className="data-transfer-preview">
               <p className="field-hint">
                 <strong>{file.name}</strong> — exported {new Date(file.data.exported_at).toLocaleString()}
@@ -263,7 +310,14 @@ export default function DataTransferModal({ user, onClose }) {
             </div>
           )}
 
-          {result && (
+          {result?.sql && (
+            <div className="task-notice" style={{ marginTop: 12 }}>
+              SQL imported — the database was restored from the file.
+              <button type="button" className="btn btn-sm" onClick={() => window.location.reload()}>Reload to see it</button>
+            </div>
+          )}
+
+          {result && !result.sql && (
             <div className="task-notice" style={{ marginTop: 12 }}>
               Imported. <Counts tables={result.added} />
               {result.peopleCreated?.length > 0 && (
