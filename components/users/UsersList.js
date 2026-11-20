@@ -7,6 +7,8 @@ import { Avatar, formatDateTime } from '@/components/tasks/taskUi';
 import { permissionLabel } from '@/lib/taskConfig';
 import UserFormModal from '@/components/users/UserFormModal';
 import ExportMenu from '@/components/ExportMenu';
+import PasswordConfirmModal from '@/components/PasswordConfirmModal';
+import '@/components/users/user-admin.css';
 
 export default function UsersList({ users, isAdmin }) {
   const router = useRouter();
@@ -15,6 +17,54 @@ export default function UsersList({ users, isAdmin }) {
   const [editing, setEditing] = useState(null); // null | 'new' | user
   const [adminError, setAdminError] = useState('');
   const [savingAdmin, setSavingAdmin] = useState(null);
+  const [deleting, setDeleting] = useState(null); // user waiting for the password
+
+  // Accounts you created, or (admin) anyone who isn't another admin.
+  const canManage = (u) => u.managed || (isAdmin && !u.is_admin);
+
+  async function setActive(u, value) {
+    if (!value && !window.confirm(`Deactivate ${u.name}? They're signed out everywhere and can't log in until you turn the account back on. Their data is kept.`)) return;
+    setAdminError('');
+    setSavingAdmin(u.id);
+    try {
+      const res = await fetch(`/api/users/${u.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: value }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || 'Could not change the account.');
+      router.refresh();
+    } catch (err) {
+      setAdminError(err.message);
+    } finally {
+      setSavingAdmin(null);
+    }
+  }
+
+  async function deleteUser(password) {
+    const res = await fetch(`/api/users/${deleting.id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.error || 'Could not delete the account.');
+    setDeleting(null);
+    router.refresh();
+  }
+
+  function accountActions(u) {
+    if (!canManage(u)) return null;
+    return (
+      <>
+        <button type="button" className="btn btn-sm" disabled={savingAdmin === u.id} onClick={() => setActive(u, !u.is_active)}>
+          {u.is_active ? 'Deactivate' : 'Activate'}
+        </button>
+        <button type="button" className="btn btn-sm btn-danger" onClick={() => setDeleting(u)}>Delete</button>
+      </>
+    );
+  }
 
   async function setAdmin(u, value) {
     const verb = value ? 'Make' : 'Remove';
@@ -60,10 +110,11 @@ export default function UsersList({ users, isAdmin }) {
           <ExportMenu
             getTable={() => ({
               title: 'Users',
-              columns: ['Name', 'Email', 'Created by you', 'Joined', 'Your boards (permissions)'],
+              columns: ['Name', 'Email', 'Status', 'Created by you', 'Joined', 'Your boards (permissions)'],
               rows: shown.map((u) => [
                 u.name,
                 u.email,
+                u.is_active ? 'Active' : 'Deactivated',
                 u.managed ? 'Yes' : 'No',
                 formatDateTime(u.created_at),
                 u.boards.map((b) => `${b.name} (${permissionLabel(b)})`).join('; '),
@@ -107,13 +158,14 @@ export default function UsersList({ users, isAdmin }) {
             </thead>
             <tbody>
               {shown.map((u) => (
-                <tr key={u.id} onDoubleClick={() => (isAdmin ? router.push(`/dashboard/users/${u.id}`) : u.managed && setEditing(u))}>
+                <tr key={u.id} className={u.is_active ? undefined : 'user-row-inactive'} onDoubleClick={() => (isAdmin ? router.push(`/dashboard/users/${u.id}`) : u.managed && setEditing(u))}>
                   <td>
                     <span className="task-assignee">
                       <Avatar person={u} size={26} />
                       <strong>{u.name}</strong>
                       {u.managed && <span className="task-role-badge admin">Created by you</span>}
                       {u.is_admin && <span className="task-role-badge admin">Admin</span>}
+                      {!u.is_active && <span className="task-role-badge user-deactivated">Deactivated</span>}
                     </span>
                   </td>
                   <td>{u.email}</td>
@@ -145,9 +197,13 @@ export default function UsersList({ users, isAdmin }) {
                         {(!u.is_admin || u.managed) && (
                           <button type="button" className="btn btn-sm" onClick={() => setEditing(u)}>✎ Edit</button>
                         )}
+                        {accountActions(u)}
                       </span>
                     ) : u.managed ? (
-                      <button type="button" className="btn btn-sm" onClick={() => setEditing(u)}>✎ Edit</button>
+                      <span className="user-admin-actions">
+                        <button type="button" className="btn btn-sm" onClick={() => setEditing(u)}>✎ Edit</button>
+                        {accountActions(u)}
+                      </span>
                     ) : (
                       <span className="task-muted" style={{ fontSize: 12 }} title="Only the person themselves, or whoever created it, can change this account">{u.created_by ? 'Created by someone else' : 'Registered themselves'}</span>
                     )}
@@ -168,8 +224,18 @@ export default function UsersList({ users, isAdmin }) {
         </div>
       </div>
       <p className="field-hint" style={{ marginTop: 10 }}>
-        You can edit the name, email and password of accounts you created. Board permissions are changed in each board’s Settings → Members.
+        You can edit, deactivate or delete accounts you created. Board permissions are changed in each board’s Settings → Members.
       </p>
+
+      {deleting && (
+        <PasswordConfirmModal
+          title={`Delete ${deleting.name}?`}
+          message={`${deleting.email} is deleted for good, with everything it owns — tracks, notes, its own task boards and history. Tasks assigned to them on other boards stay, as “Former member”. To only block the account, use Deactivate instead.`}
+          confirmLabel="Delete user"
+          onConfirm={deleteUser}
+          onCancel={() => setDeleting(null)}
+        />
+      )}
 
       {editing && (
         <UserFormModal

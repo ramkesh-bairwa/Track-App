@@ -1209,6 +1209,10 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS app_lock_password VARCHAR(255) NULL;
 -- off. Switched in Login history; when off the camera isn't used at all.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS login_photos TINYINT(1) NOT NULL DEFAULT 1;
 
+-- Deactivated accounts can't sign in and every open session ends; their data
+-- stays. 1 = active. (lib/userStatus.js adds it on MySQL servers too.)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active TINYINT(1) NOT NULL DEFAULT 1;
+
 -- Track history: every change to a track, its columns and records, per track
 -- (sub-tracks have their own). Record changes keep each field's old and new
 -- value (lib/trackLog.js); a deleted record's data is kept in `snapshot` so it

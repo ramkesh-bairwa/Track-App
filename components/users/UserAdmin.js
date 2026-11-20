@@ -6,6 +6,7 @@ import { Avatar, formatDateTime } from '@/components/tasks/taskUi';
 import ActivityList from '@/components/activity/ActivityList';
 import AttendanceView from '@/components/attendance/AttendanceView';
 import UserCalendarReview from '@/components/users/UserCalendarReview';
+import UserDataModal from '@/components/users/UserDataModal';
 import UserFormModal from '@/components/users/UserFormModal';
 import './user-admin.css';
 
@@ -116,6 +117,7 @@ export default function UserAdmin({ userId, meId }) {
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
   const [days, setDays] = useState(14);
+  const [dataView, setDataView] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -220,19 +222,27 @@ export default function UserAdmin({ userId, meId }) {
 
       <div className="ua-tiles">
         {[
-          ['Tracks', counts.tracks],
-          ['Records', counts.records],
-          ['Notes', counts.notes],
-          ['Task boards', counts.boards],
-          ['Tasks assigned', counts.tasks],
-          ['Desktop apps', devices.filter((d) => !d.revoked).length],
-        ].map(([label, n]) => (
-          <div key={label} className="ua-tile">
-            <strong>{n}</strong>
-            <span>{label}</span>
-          </div>
-        ))}
+          ['Tracks', counts.tracks, 'tracks'],
+          ['Records', counts.records, 'tracks'],
+          ['Notes', counts.notes, 'notes'],
+          ['Task boards', counts.boards, 'boards'],
+          ['Tasks assigned', counts.tasks, 'tasks'],
+          ['Desktop apps', devices.filter((d) => !d.revoked).length, null],
+        ].map(([label, n, section]) =>
+          section ? (
+            <button key={label} type="button" className="ua-tile ua-tile-btn" onClick={() => setDataView(section)} title={`View ${label.toLowerCase()}`}>
+              <strong>{n}</strong>
+              <span>{label} →</span>
+            </button>
+          ) : (
+            <div key={label} className="ua-tile">
+              <strong>{n}</strong>
+              <span>{label}</span>
+            </div>
+          )
+        )}
       </div>
+      {dataView && <UserDataModal userId={user.id} section={dataView} onClose={() => setDataView(null)} />}
 
       <section className="table-panel ua-section">
         <h2>Desktop apps</h2>

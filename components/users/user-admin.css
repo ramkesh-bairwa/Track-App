@@ -38,6 +38,8 @@
 .ua-events img, .ua-nophoto { width: 64px; height: 48px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); flex: none; }
 .ua-nophoto { display: grid; place-items: center; font-size: 10px; color: var(--text-muted); }
 .user-admin-actions { display: inline-flex; gap: 6px; }
+.task-role-badge.user-deactivated { background: var(--danger-dim); border-color: var(--danger); color: var(--danger); }
+.user-row-inactive td:not(:last-child) { opacity: 0.55; }
 @media (max-width: 900px) {
   .ua-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .ua-two { grid-template-columns: 1fr; }

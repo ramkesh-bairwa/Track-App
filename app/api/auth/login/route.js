@@ -4,6 +4,7 @@ import { verifyPassword, createSessionToken, SESSION_COOKIE } from '@/lib/auth';
 import { withApiErrors } from '@/lib/apiError';
 import { clientIp, hit, isLimited, reset, retryAfter } from '@/lib/rateLimit';
 import { recordLogin, checkLoginPhoto } from '@/lib/loginHistory';
+import { isUserActive } from '@/lib/userStatus';
 
 // Password guessing: 10 wrong passwords per email, or 100 failed logins per
 // address, within 15 minutes → 429 until the window passes.
@@ -45,6 +46,9 @@ export const POST = withApiErrors(async (request) => {
   const valid = await verifyPassword(password, user.password);
   if (!valid) return failed();
   reset(emailKey);
+  if (!(await isUserActive(user.id))) {
+    return NextResponse.json({ error: 'This account has been deactivated. Ask your admin to turn it back on.' }, { status: 403 });
+  }
 
   // Audit the login. The webcam photo is best-effort: a blocked or missing
   // camera must never stop the account owner from signing in, so an invalid
