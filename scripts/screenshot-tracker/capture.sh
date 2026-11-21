@@ -6,7 +6,8 @@
 #           the mouse when no window is focused, e.g. on the bare desktop)
 #   screen  the whole screen under the mouse
 #   all     every display (extra displays: HH-MM-SS-display2.jpg …)
-# The ScreenTracker app runs this at login and then every 5 minutes (see install.sh).
+# The ScreenTracker app runs this at login and then every 5 minutes (see install.sh),
+# but it only captures while switched on (.enabled in $SCREENSHOT_DIR).
 # Each run also writes $SCREENSHOT_DIR/.status.json, which the Screenshots page shows.
 
 # install.sh writes the settings here, so they can change without rebuilding
@@ -30,9 +31,10 @@ status() { # status <state> <message>
     "$(date +%Y-%m-%dT%H:%M:%S%z)" "$1" "$CAPTURE_MODE" "$2" > "$SCREENSHOT_DIR/.status.json"
 }
 
-# Turned off from the Screenshots page.
-if [ -f "$SCREENSHOT_DIR/.paused" ]; then
-  status paused "Screenshots are turned off."
+# Off unless switched on from the Screenshots page (it creates .enabled and
+# removes it again when switched off). The setting sticks across restarts.
+if [ ! -f "$SCREENSHOT_DIR/.enabled" ]; then
+  status paused "Screenshots are switched off. Turn them on from the Screenshots page."
   exit 0
 fi
 

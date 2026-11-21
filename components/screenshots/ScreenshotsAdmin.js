@@ -24,9 +24,10 @@ const whenText = (iso) => {
 // How the tracker's last run went, so a missing permission isn't a silent
 // stream of wallpaper-only shots.
 function TrackerStatus({ status }) {
-  if (!status) return null;
+  // While switched off the tracker only reports "paused" — the switch above says that.
+  if (!status || status.state === 'paused') return null;
   const bad = status.state === 'no-permission' || status.state === 'error';
-  const label = { ok: 'Last capture', skipped: 'Last run skipped', paused: 'Last run skipped', 'no-permission': 'Not capturing', error: 'Capture failed' }[status.state] || 'Last run';
+  const label = { ok: 'Last capture', skipped: 'Last run skipped', 'no-permission': 'Not capturing', error: 'Capture failed' }[status.state] || 'Last run';
   return (
     <div className={`shots-status${bad ? ' bad' : ''}`}>
       <i className={`fa-solid ${bad ? 'fa-triangle-exclamation' : 'fa-circle-check'}`} />
@@ -59,12 +60,12 @@ function Portal({ children }) {
 }
 
 // Admin-only: every account's tracker screenshots, by day, with delete.
-export default function ScreenshotsAdmin() {
+export default function ScreenshotsAdmin({ initialUserId = null }) {
   const [users, setUsers] = useState(null);
-  const [userId, setUserId] = useState(null);
+  const [userId, setUserId] = useState(initialUserId);
   const [days, setDays] = useState(null);
   const [status, setStatus] = useState(null);
-  const [paused, setPaused] = useState(null);
+  const [power, setPower] = useState(null); // { enabled, since, by }
   const [toggling, setToggling] = useState(false);
   const [date, setDate] = useState(null);
   const [files, setFiles] = useState(null);
@@ -88,10 +89,10 @@ export default function ScreenshotsAdmin() {
   const loadDays = useCallback(async () => {
     if (userId == null) return;
     try {
-      const { days: counts, status: last, paused: off } = await api(`/api/admin/screenshots/${userId}`);
+      const { days: counts, status: last, power: sw } = await api(`/api/admin/screenshots/${userId}`);
       setDays(counts);
       setStatus(last);
-      setPaused(off);
+      setPower(sw || { enabled: false });
       setDate((d) => (d && counts[d] ? d : Object.keys(counts).sort().pop() || null));
     } catch (err) {
       setError(err.message);
@@ -100,7 +101,7 @@ export default function ScreenshotsAdmin() {
   useEffect(() => {
     setDays(null);
     setStatus(null);
-    setPaused(null);
+    setPower(null);
     setDate(null);
     loadDays();
   }, [loadDays]);
@@ -168,12 +169,17 @@ export default function ScreenshotsAdmin() {
       },
     });
   }
-  async function togglePaused() {
+  // Off by default; once on, the tracker (this Mac's and the desktop app's)
+  // captures every 5 minutes, also after a restart, until switched off.
+  async function togglePower() {
+    const enabled = !power.enabled;
     setToggling(true);
     setError('');
     try {
-      const json = await api(`/api/admin/screenshots/${userId}`, 'PATCH', { paused: !paused });
-      setPaused(json.paused);
+      const json = await api(`/api/admin/screenshots/${userId}`, 'PATCH', { enabled });
+      setPower(json.power);
+      // The first capture runs right away when switched on — pick it up.
+      if (enabled) setTimeout(() => refresh(), 6000);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -240,24 +246,28 @@ export default function ScreenshotsAdmin() {
         </aside>
 
         <section className="shots-panel shots-main">
-          {user && paused !== null && (
+          {user && power && (
             <div className="shots-capture">
               <span className="shots-capture-text">
                 <strong>Screenshots for {user.name}</strong>
-                <span>{paused ? 'Off — the tracker skips every capture until you turn them back on.' : 'On — a capture every 5 minutes.'}</span>
+                <span>
+                  {power.enabled
+                    ? `On — a capture every 5 minutes, also after a restart, until you switch it off.${power.since ? ` On since ${whenText(power.since)}${power.by ? ` by ${power.by}` : ''}.` : ''}`
+                    : 'Off — nothing is captured. Switch on to start; the first screenshot is taken right away.'}
+                </span>
               </span>
               <button
                 type="button"
                 role="switch"
-                aria-checked={!paused}
+                aria-checked={power.enabled}
                 aria-label={`Screenshots for ${user.name}`}
-                className={`shots-switch${paused ? '' : ' on'}`}
-                onClick={togglePaused}
+                className={`shots-switch${power.enabled ? ' on' : ''}`}
+                onClick={togglePower}
                 disabled={toggling}
               >
                 <span className="shots-switch-knob" />
               </button>
-              <span className="shots-switch-label">{paused ? 'Off' : 'On'}</span>
+              <span className="shots-switch-label">{power.enabled ? 'On' : 'Off'}</span>
             </div>
           )}
           <TrackerStatus status={status} />

@@ -10390,6 +10390,13 @@ button.note-tag {
 .login-actions:focus-within {
   opacity: 1;
 }
+/* Touch screens have no hover — keep the delete buttons visible. */
+@media (hover: none) {
+  .login-actions,
+  .login-sub-delete {
+    opacity: 1;
+  }
+}
 .login-action {
   display: inline-flex;
   align-items: center;
